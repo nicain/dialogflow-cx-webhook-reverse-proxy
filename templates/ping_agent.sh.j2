@@ -1,0 +1,26 @@
+#! /bin/bash
+
+PROJECT_ID={{PROJECT_ID}}
+
+AGENT_NAME=$(curl -s -X GET -H "Authorization: Bearer $(gcloud auth print-access-token)" \
+  -H "Content-Type:application/json" \
+  -H "x-goog-user-project: ${PROJECT_ID}" \
+  "https://{{REGION}}-dialogflow.googleapis.com/v3/projects/${PROJECT_ID?}/locations/{{REGION}}/agents" | jq -r '.agents[0].name')
+CRUISE_PLAN_FLOW=$(curl -s -X GET -H "Authorization: Bearer $(gcloud auth print-access-token)" \
+  -H "Content-Type:application/json" \
+  -H "x-goog-user-project: ${PROJECT_ID}" \
+  "https://{{REGION}}-dialogflow.googleapis.com/v3/${AGENT_NAME?}/flows" | jq -r '.flows | map(select(.displayName== "Cruise Plan"))[0].name')
+CUSTOMER_LINE_PAGE=$(curl -s -X GET -H "Authorization: Bearer $(gcloud auth print-access-token)" \
+  -H "Content-Type:application/json" \
+  -H "x-goog-user-project: ${PROJECT_ID}" \
+  "https://{{REGION}}-dialogflow.googleapis.com/v3/${CRUISE_PLAN_FLOW?}/pages" | jq -r '.pages | map(select(.displayName== "Collect Customer Line"))[0].name')
+RESPONSE=$(curl -s -X POST -H "Authorization: Bearer $(gcloud auth print-access-token)" \
+  -H "Content-Type:application/json" \
+  -H "x-goog-user-project: ${PROJECT_ID}" \
+  -d \
+  "{
+    \"queryInput\": {\"languageCode\": \"en\", \"text\": {\"text\": \"123456\"}},
+    \"queryParams\": {\"currentPage\": \"${CUSTOMER_LINE_PAGE?}\"}
+  }" \
+  "https://{{REGION}}-dialogflow.googleapis.com/v3/${AGENT_NAME?}/sessions/123456:detectIntent" | jq -r '.queryResult.responseMessages[0].text.text[0]')
+echo ${RESPONSE?}

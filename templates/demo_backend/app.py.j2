@@ -1,0 +1,85 @@
+from flask import Flask, request, Response
+import os
+import tasks
+import invoke
+import pathlib
+import logging
+
+
+app = Flask(__name__)
+gunicorn_logger = logging.getLogger('gunicorn.error')
+app.logger.handlers = gunicorn_logger.handlers
+app.logger.setLevel(gunicorn_logger.level)
+
+
+CONFIG_FILE="{{CONFIG_FILE}}"
+SA_NAME="{{DEMO_BACKEND_SA_NAME}}"
+BUILD_DIR=pathlib.Path('/app')
+
+
+tasks.login_sa(invoke.Context(), 'demo-backend', config_file=CONFIG_FILE, build_dir=BUILD_DIR)
+
+
+@app.route('/')
+def home():
+  return Response(status='200', response='OK')
+
+
+@app.route('/configuration', methods=['GET'])
+def configuration():
+
+  configuration_dict = {}
+  for key in request.args:
+    configuration_dict[key] = tasks.get(invoke.Context(), key, config_file=CONFIG_FILE, build_dir=BUILD_DIR)
+  return configuration_dict
+
+
+@app.route('/ping_webhook', methods=['GET'])
+def ping_webhook():
+  app.logger.info('ping_webhook:')
+  result_dict = tasks.ping_webhook(invoke.Context(), sa_name=SA_NAME, config_file=CONFIG_FILE, build_dir=BUILD_DIR)
+  app.logger.info(f'  ping_webhook: {result_dict["status"]}')
+  return Response(**result_dict)
+
+
+@app.route('/update_webhook', methods=['POST'])
+def update_webhook():
+  app.logger.info('update_webhook:')
+  content = request.get_json(silent=True)
+
+  allow_unauthenticated = content.get('allow_unauthenticated', True)
+  app.logger.info(f'  allow_unauthenticated: {allow_unauthenticated}')
+  ingress_settings = content.get('ingress_settings', 'all')
+  app.logger.info(f'  ingress_settings: {ingress_settings}')
+
+  result_dict = tasks.update_webhook(invoke.Context(), 
+    sa_name=SA_NAME,
+    allow_unauthenticated=allow_unauthenticated,
+    ingress_settings=ingress_settings,
+    config_file=CONFIG_FILE, build_dir=BUILD_DIR),
+  app.logger.info(f'  update_webhook: {result_dict["status"]}')
+  return Response(**result_dict)
+
+
+@app.route('/update_security_perimeter', methods=['POST'])
+def update_security_perimeter():
+  app.logger.info('update_security_perimeter:')
+  content = request.get_json(silent=True)
+  restrict_cloudfunctions = content.get('restrict_cloudfunctions', True)
+  app.logger.info(f'  restrict_cloudfunctions: {restrict_cloudfunctions}')
+  restrict_dialogflow = content.get('restrict_dialogflow', True)
+  app.logger.info(f'  restrict_dialogflow: {restrict_dialogflow}')
+  result_dict = tasks.update_security_perimeter(
+    invoke.Context(),
+    config_file=CONFIG_FILE, build_dir=BUILD_DIR,
+    restrict_cloudfunctions=restrict_cloudfunctions,
+    restrict_dialogflow=restrict_dialogflow,
+    sa_name=SA_NAME,
+  )
+  app.logger.info(f'  update_security_perimeter: TODO STATUS CODE')
+  return Response(**result_dict)
+
+
+if __name__ == "__main__":
+    port = int(os.environ.get('PORT', 5000))
+    app.run(debug=True, host='0.0.0.0', port=port)
