@@ -91,6 +91,22 @@ def setup(c,
   c.run(f"mkdir -p {build_dir}/keys")
   c.run(f"mkdir -p {build_dir}/demo_backend")
 
+  login(c, config_file, build_dir)
+  headers = {}
+  token = c.run('gcloud auth print-access-token', hide=True).stdout.strip()
+  headers['Authorization'] = f'Bearer {token}'
+  organization_id = get_project_ancestor(c,
+    ancestor_type='organization',
+    config_file=config_file,
+    build_dir=build_dir)
+  query = f'parent=organizations/{organization_id}'
+  response_json = requests.get(f"https://accesscontextmanager.googleapis.com/v1/accessPolicies?{query}", headers=headers).json()
+  access_policies = {p['title']:p for p in response_json['accessPolicies']}
+  if access_policy not in access_policies:
+    raise ValueError(f'Policy title "{access_policy}" not found for organization: "organizations/{organization_id}". Please contact an administrator.')
+  else:
+    access_policy_name = access_policies[access_policy]["name"]
+
   with open(build_dir / config_file, 'w', encoding='utf-8') as f:
     json.dump({
       'PRINCIPAL':principal,
@@ -117,6 +133,7 @@ def setup(c,
       'SERVICE_DIRECTORY_ENDPOINT':service_directory_endpoint,
       'SECURITY_PERIMETER':security_perimeter,
       'DEMO_BACKEND_SA_NAME':demo_backend_sa_name,
+      'ACCESS_POLICY_NAME':access_policy_name,
     }, f, indent=2, sort_keys=True)
     f.write('\n')
 
@@ -232,7 +249,7 @@ def configure(c,
       settings["PROJECT_ID"],
       roles = ['storage.admin', 'compute.admin', 'iam.serviceAccountUser', 'cloudfunctions.developer', 'artifactregistry.admin', 'cloudbuild.builds.editor', 'dialogflow.admin', 'serviceusage.serviceUsageConsumer', 'browser']
     )
-    c.run(f'gcloud access-context-manager policies add-iam-policy-binding --member=serviceAccount:{settings["SETUP_SA_NAME"]}@{settings["PROJECT_ID"]}.iam.gserviceaccount.com --role=roles/accesscontextmanager.policyEditor {settings["ACCESS_POLICY"]}', warn=True)
+    c.run(f'gcloud access-context-manager policies add-iam-policy-binding --member=serviceAccount:{settings["SETUP_SA_NAME"]}@{settings["PROJECT_ID"]}.iam.gserviceaccount.com --role=roles/accesscontextmanager.policyEditor {settings["ACCESS_POLICY_NAME"]}', warn=True)
     set_up_service_account(c,
       settings["REVERSE_PROXY_SA_NAME"],
       build_dir/"keys"/settings["REVERSE_PROXY_SA_NAME"],
@@ -249,9 +266,9 @@ def configure(c,
       settings["DEMO_BACKEND_SA_NAME"],
       build_dir/"keys"/settings["DEMO_BACKEND_SA_NAME"],
       settings["PROJECT_ID"],
-      roles = ['cloudfunctions.editor', 'browser', 'accesscontextmanager.policyEditor']
+      roles = ['cloudfunctions.developer', 'browser', 'accesscontextmanager.policyEditor']
     )
-    c.run(f'gcloud access-context-manager policies add-iam-policy-binding --member=serviceAccount:{settings["SETUP_SA_NAME"]}@{settings["PROJECT_ID"]}.iam.gserviceaccount.com --role=roles/accesscontextmanager.policyEditor {settings["ACCESS_POLICY"]}', warn=True)
+    c.run(f'gcloud access-context-manager policies add-iam-policy-binding --member=serviceAccount:{settings["SETUP_SA_NAME"]}@{settings["PROJECT_ID"]}.iam.gserviceaccount.com --role=roles/accesscontextmanager.policyEditor {settings["ACCESS_POLICY_NAME"]}', warn=True)
 
   # Configure Network:
   if vpc:
@@ -463,16 +480,16 @@ def deploy_agent(c,
   settings = source(c, config_file, build_dir, stdout=False)
   login_sa(c, settings["SETUP_SA_NAME"], config_file, build_dir)
 
-  # # Create service directory:
-  # c.run(f'gcloud service-directory namespaces create {settings["SERVICE_DIRECTORY_NAMESPACE"]} --location {settings["REGION"]}', warn=True)
-  # c.run(f'gcloud service-directory services create {settings["SERVICE_DIRECTORY_SERVICE"]} --namespace {settings["SERVICE_DIRECTORY_NAMESPACE"]} --location {settings["REGION"]}', warn=True)
-  # c.run(f'gcloud service-directory endpoints create {settings["SERVICE_DIRECTORY_ENDPOINT"]} \
-  #   --service={settings["SERVICE_DIRECTORY_SERVICE"]} \
-  #   --namespace={settings["SERVICE_DIRECTORY_NAMESPACE"]} \
-  #   --location={settings["REGION"]} \
-  #   --address={settings["REVERSE_PROXY_SERVER_IP"]} \
-  #   --port=443 \
-  #   --network=projects/{settings["PROJECT_NUMBER"]}/locations/global/networks/{settings["NETWORK"]}', warn=True)
+  # Create service directory:
+  c.run(f'gcloud service-directory namespaces create {settings["SERVICE_DIRECTORY_NAMESPACE"]} --location {settings["REGION"]}', warn=True)
+  c.run(f'gcloud service-directory services create {settings["SERVICE_DIRECTORY_SERVICE"]} --namespace {settings["SERVICE_DIRECTORY_NAMESPACE"]} --location {settings["REGION"]}', warn=True)
+  c.run(f'gcloud service-directory endpoints create {settings["SERVICE_DIRECTORY_ENDPOINT"]} \
+    --service={settings["SERVICE_DIRECTORY_SERVICE"]} \
+    --namespace={settings["SERVICE_DIRECTORY_NAMESPACE"]} \
+    --location={settings["REGION"]} \
+    --address={settings["REVERSE_PROXY_SERVER_IP"]} \
+    --port=443 \
+    --network=projects/{settings["PROJECT_NUMBER"]}/locations/global/networks/{settings["NETWORK"]}', warn=True)
 
   # # Create Telecommunications agent:
   token = c.run('gcloud auth print-access-token', hide=True).stdout.strip()
@@ -623,18 +640,16 @@ def get_project_ancestor(c,
   ancestor_type=None,
   config_file=pathlib.Path(CONFIG_FILE_DEFAULT),
   build_dir=pathlib.Path(BUILD_DIR_DEFAULT),
-  sa_name=None,
 ):
   settings = source(c, config_file, build_dir, stdout=False)
-  if not sa_name:
-    sa_name = settings["SETUP_SA_NAME"]
-  login_sa(c, sa_name, config_file, build_dir)
-
   token = c.run('gcloud auth print-access-token', hide=True).stdout.strip()
   result = c.run(f'curl -s -X POST -H "Authorization: Bearer {token}" "https://cloudresourcemanager.googleapis.com/v1/projects/{settings["PROJECT_ID"]}:getAncestry"', warn=True, hide=True)
   for ancestor_dict in json.loads(result.stdout.strip())['ancestor']:
     if ancestor_dict["resourceId"]["type"] == ancestor_type:
       return ancestor_dict["resourceId"]["id"]
+
+
+@task
 
 
 @task
@@ -645,13 +660,13 @@ def create_security_perimeter(c,
   settings = source(c, config_file, build_dir, stdout=False)
 
   # Get Access policy info:
-  access_policy_id = settings["ACCESS_POLICY"].split('/')[1]
+  access_policy_id = settings["ACCESS_POLICY_NAME"].split('/')[1]
   
   # Break out early if perimeter already exists:
   token = c.run('gcloud auth print-access-token', hide=True).stdout.strip()
   headers = {}
   headers['Authorization'] = f'Bearer {token}'
-  response_json = requests.get(f'https://accesscontextmanager.googleapis.com/v1/{access_policy_name}/servicePerimeters', headers=headers).json()
+  response_json = requests.get(f'https://accesscontextmanager.googleapis.com/v1/{settings["ACCESS_POLICY_NAME"]}/servicePerimeters', headers=headers).json()
   if response_json:
     for service_perimeter in response_json['servicePerimeters']:
       if service_perimeter['title'] == settings["SECURITY_PERIMETER"]:
@@ -659,6 +674,7 @@ def create_security_perimeter(c,
 
   # Create the perimeter:
   c.run(f'gcloud access-context-manager perimeters create {settings["SECURITY_PERIMETER"]} --policy={access_policy_id} --title={settings["SECURITY_PERIMETER"]} --resources=projects/{settings["PROJECT_NUMBER"]}')
+
 
 @task
 def update_security_perimeter(c,
@@ -673,7 +689,7 @@ def update_security_perimeter(c,
     sa_name = settings["SETUP_SA_NAME"]
 
   # Get Access policy info:
-  access_policy_id = settings["ACCESS_POLICY"].split('/')[1]
+  access_policy_id = settings["ACCESS_POLICY_NAME"].split('/')[1]
 
   restricted_services = []
   if restrict_dialogflow:
