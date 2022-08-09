@@ -123,14 +123,13 @@ def setup(c,
   c.run(f"mkdir -p {build_dir}/keys")
   c.run(f"mkdir -p {build_dir}/demo_backend")
 
-  login(c, config_file, build_dir)
+  login(c, principal)
   headers = {}
   token = c.run('gcloud auth print-access-token', hide=True).stdout.strip()
   headers['Authorization'] = f'Bearer {token}'
   organization_id = get_project_ancestor(c,
-    ancestor_type='organization',
-    config_file=config_file,
-    build_dir=build_dir)
+    project_id,
+    ancestor_type='organization')
   query = f'parent=organizations/{organization_id}'
   response_json = requests.get(f"https://accesscontextmanager.googleapis.com/v1/accessPolicies?{query}", headers=headers).json()
   access_policies = {p['title']:p for p in response_json['accessPolicies']}
@@ -207,12 +206,8 @@ def source(c,
 
 
 @task
-def login(c,
-  config_file=pathlib.Path(CONFIG_FILE_DEFAULT),
-  build_dir=pathlib.Path(BUILD_DIR_DEFAULT),
-):
-  settings = source(c, config_file, build_dir, stdout=False)
-  c.run(f'gcloud auth login --quiet {settings["PRINCIPAL"]} --no-launch-browser', hide=True)
+def login(c, principal):
+  c.run(f'gcloud auth login --quiet {principal} --no-launch-browser', hide=True)
 
 
 @task
@@ -267,20 +262,20 @@ def configure(c,
 
   # Enable APIs:
   if apis:
-    login(c, config_file, build_dir)
+    login(c, settings['PRINCIPAL'])
     for api in ['compute','iam','dialogflow','servicedirectory','run','cloudbuild','cloudfunctions','artifactregistry','accesscontextmanager', 'vpcaccess']:
       c.run(f'gcloud services enable {api}.googleapis.com')
 
   # Configure service identity for dialogflow:
   if service_identities:
-    login(c, config_file, build_dir)
+    login(c, settings['PRINCIPAL'])
     c.run('gcloud beta services identity create --service=dialogflow.googleapis.com')
     for role in ['servicedirectory.viewer', 'servicedirectory.pscAuthorizedService']:
       c.run(f'gcloud projects add-iam-policy-binding {settings["PROJECT_ID"]} --member=serviceAccount:service-{settings["PROJECT_NUMBER"]}@gcp-sa-dialogflow.iam.gserviceaccount.com --role=roles/{role}')
 
   # Configure service account for remaining setup:
   if service_accounts:
-    login(c, config_file, build_dir)
+    login(c, settings['PRINCIPAL'])
     set_up_service_account(c,
       settings["SETUP_SA_NAME"],
       build_dir/"keys"/settings["SETUP_SA_NAME"],
@@ -339,6 +334,7 @@ def configure(c,
       --router-region={settings["REGION"]}', warn=True)
 
   if connector:
+    login_sa(c, settings["SETUP_SA_NAME"], config_file, build_dir)
     c.run(f'gcloud compute networks vpc-access connectors create demo-backend-connector --region {settings["REGION"]} --subnet {settings["SUBNET"]}', warn=True)
   
   if storage:
@@ -346,6 +342,7 @@ def configure(c,
     c.run(f'gsutil mb gs://{settings["PROJECT_ID"]}', warn=True)
 
   if artifact_repository:
+    login_sa(c, settings["SETUP_SA_NAME"], config_file, build_dir)
     c.run(f'gcloud auth configure-docker {settings["REGION"]}-docker.pkg.dev')
     c.run(f'gcloud artifacts repositories create {settings["ARTIFACT_REGISTRY"]} --location {settings["REGION"]} --repository-format "docker"', warn=True)
 
@@ -490,7 +487,7 @@ def ping_webhook_from_reverse_proxy_server(c,
   login_sa(c, settings["WEBHOOK_INVOKER_SA_NAME"], config_file, build_dir)
   token = c.run('gcloud auth print-identity-token', hide=True).stdout.strip()
 
-  login(c, config_file, build_dir)
+  login(c, settings['PRINCIPAL'])
   ping_command = f'echo quit | openssl s_client -showcerts -servername {settings["DOMAIN"]} -connect {settings["REVERSE_PROXY_SERVER_IP"]}:443 > webhook-reverse-proxy-server.pem && curl -X POST  --resolve {settings["DOMAIN"]}:443:127.0.0.1 --cacert webhook-reverse-proxy-server.pem -H "Authorization: Bearer {token}" -H "Content-Type:application/json" --data @/etc/docker/ping-payload.json https://{settings["DOMAIN"]}'
   result = c.run(f'gcloud compute ssh {settings["REVERSE_PROXY_SERVER"]} --project={settings["PROJECT_ID"]} --zone={settings["ZONE"]} --command=\'{ping_command}\'', hide=True)
   print(result.stdout.strip())
@@ -507,7 +504,7 @@ def ping_webhook_from_vpc(c,
   login_sa(c, settings["WEBHOOK_INVOKER_SA_NAME"], config_file, build_dir)
   token = c.run('gcloud auth print-identity-token', hide=True).stdout.strip()
 
-  login(c, config_file, build_dir)
+  login(c, settings['PRINCIPAL'])
   ping_command = f'curl -X POST -H "Authorization: Bearer {token}" -H "Content-Type:application/json" --data @/etc/docker/ping-payload.json {settings["WEBHOOK_TRIGGER_URI"]}'
   result = c.run(f'gcloud compute ssh {settings["REVERSE_PROXY_SERVER"]} --project={settings["PROJECT_ID"]} --zone={settings["ZONE"]} --command=\'{ping_command}\'', hide=True)
   print(result.stdout.strip())
@@ -634,7 +631,7 @@ def ping_agent_from_vpc(c,
   template_dir=pathlib.Path('templates'),
 ):
   settings = source(c, config_file, build_dir, stdout=False)
-  login(c, config_file, build_dir)
+  login(c, settings['PRINCIPAL'])
 
   src = template_dir/"ping_agent.sh.j2"
   tgt = build_dir/"ping_agent.sh"
@@ -679,13 +676,11 @@ def update_agent_webhook(c,
 
 @task
 def get_project_ancestor(c,
+  project_id,
   ancestor_type=None,
-  config_file=pathlib.Path(CONFIG_FILE_DEFAULT),
-  build_dir=pathlib.Path(BUILD_DIR_DEFAULT),
 ):
-  settings = source(c, config_file, build_dir, stdout=False)
   token = c.run('gcloud auth print-access-token', hide=True).stdout.strip()
-  result = c.run(f'curl -s -X POST -H "Authorization: Bearer {token}" "https://cloudresourcemanager.googleapis.com/v1/projects/{settings["PROJECT_ID"]}:getAncestry"', warn=True, hide=True)
+  result = c.run(f'curl -s -X POST -H "Authorization: Bearer {token}" "https://cloudresourcemanager.googleapis.com/v1/projects/{project_id}:getAncestry"', warn=True, hide=True)
   for ancestor_dict in json.loads(result.stdout.strip())['ancestor']:
     if ancestor_dict["resourceId"]["type"] == ancestor_type:
       return ancestor_dict["resourceId"]["id"]
