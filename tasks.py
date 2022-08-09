@@ -1,3 +1,28 @@
+'''
+git clone https://github.com/nicain/dialogflow-cx-webhook-reverse-proxy.git
+cd dialogflow-cx-webhook-reverse-proxy
+pip install pyinvoke
+
+# Project and access-policy don't need to exist yet:
+inv setup  --principal=nicholascain@cloudadvocacyorg.joonix.net --project-id=vpc-sc-demo-nicholascain11 --access-policy=nick_webhook_11
+
+# Skip this if project exists
+inv init --new-project --organization 298490623289
+
+# Skip this if billing already configured for project
+inv billing 0145C0-557C58-C970F3
+
+inv configure
+inv deploy-webhook
+inv deploy-reverse-proxy-server
+
+# Turn on location services for agent before running this step:
+inv deploy-agent
+
+inv deploy-demo
+'''
+
+
 from invoke import task
 import json
 import pathlib
@@ -22,6 +47,8 @@ SUBNET_DEFAULT = 'webhook-subnet'
 SUBNET_RANGE_DEFAULT = '10.10.20.0/28'
 REVERSE_PROXY_SERVER_DEFAULT = 'webhook-server'
 REVERSE_PROXY_SERVER_TAG_DEFAULT = 'latest'
+DEMO_BACKEND_SERVER_DEFAULT = 'demo-backend'
+DEMO_BACKEND_SERVER_TAG_DEFAULT = 'latest'
 REVERSE_PROXY_SERVER_VM_TAG_DEFAULT = 'webhook-reverse-proxy-vm'
 REVERSE_PROXY_SERVER_IP_DEFAULT = '10.10.20.2'
 SERVICE_DIRECTORY_NAMESPACE_DEFAULT = 'df-namespace'
@@ -29,14 +56,16 @@ SERVICE_DIRECTORY_SERVICE_DEFAULT = 'df-service'
 SERVICE_DIRECTORY_ENDPOINT_DEFAULT = 'df-endpoint'
 SECURITY_PERIMETER_DEFAULT = 'df_webhook'
 DEMO_BACKEND_SA_NAME_DEFAULT = 'demo-backend'
+ARTIFACT_REGISTRY_DEFAULT = 'webhook-registry'
 
 AGENT_SOURCE_URI = 'gs://gassets-api-ai/prebuilt_agents/cx-prebuilt-agents/exported_agent_Telecommunications.blob'
 WEBHOOK_PING_DATA = {"fulfillmentInfo":{"tag":"validatePhoneLine"},"sessionInfo":{"parameters":{"phone_number":"123456"}}}
 
 
-def apply_template(src, tgt, settings):
+def apply_template(src, tgt, settings, **kwargs):
   with open(src, 'r') as f:
     template = f.read()
+  settings.update(kwargs)
   jinja2.Template(template).stream(**settings).dump(str(tgt))
 
 
@@ -81,6 +110,9 @@ def setup(c,
   service_directory_endpoint = SERVICE_DIRECTORY_ENDPOINT_DEFAULT,
   security_perimeter = SECURITY_PERIMETER_DEFAULT,
   demo_backend_sa_name = DEMO_BACKEND_SA_NAME_DEFAULT,
+  artifact_registry = ARTIFACT_REGISTRY_DEFAULT,
+  demo_backend_server = DEMO_BACKEND_SERVER_DEFAULT,
+  demo_backend_server_tag = DEMO_BACKEND_SERVER_TAG_DEFAULT,
 ):
   if clean:
     destroy(c, build_dir)
@@ -134,6 +166,9 @@ def setup(c,
       'SECURITY_PERIMETER':security_perimeter,
       'DEMO_BACKEND_SA_NAME':demo_backend_sa_name,
       'ACCESS_POLICY_NAME':access_policy_name,
+      'ARTIFACT_REGISTRY':artifact_registry,
+      'DEMO_BACKEND_SERVER':demo_backend_server,
+      'DEMO_BACKEND_SERVER_TAG':demo_backend_server_tag,
     }, f, indent=2, sort_keys=True)
     f.write('\n')
 
@@ -160,9 +195,10 @@ def source(c,
     settings = json.load(f)
   settings["PROJECT_NUMBER"] = c.run(f'gcloud projects list --filter={settings["PROJECT_ID"]} --format="value(PROJECT_NUMBER)"', hide=True).stdout.strip()
   settings["WEBHOOK_TRIGGER_URI"] = f'https://{settings["REGION"]}-{settings["PROJECT_ID"]}.cloudfunctions.net/{settings["WEBHOOK_NAME"]}'
-  settings["REVERSE_PROXY_SERVER_REPO"] = f'{settings["REVERSE_PROXY_SERVER"]}-repo'
   settings["REVERSE_PROXY_SERVER_IMAGE"] = f'{settings["REVERSE_PROXY_SERVER"]}-image'
-  settings["REVERSE_PROXY_SERVER_IMAGE_URI"] = f'{settings["REGION"]}-docker.pkg.dev/{settings["PROJECT_ID"]}/{settings["REVERSE_PROXY_SERVER_REPO"]}/{settings["REVERSE_PROXY_SERVER_IMAGE"]}:{settings["REVERSE_PROXY_SERVER_TAG"]}'
+  settings["REVERSE_PROXY_SERVER_IMAGE_URI"] = f'{settings["REGION"]}-docker.pkg.dev/{settings["PROJECT_ID"]}/{settings["ARTIFACT_REGISTRY"]}/{settings["REVERSE_PROXY_SERVER_IMAGE"]}:{settings["REVERSE_PROXY_SERVER_TAG"]}'
+  settings["DEMO_BACKEND_SERVER_IMAGE"] = f'{settings["DEMO_BACKEND_SERVER"]}-image'
+  settings["DEMO_BACKEND_SERVER_IMAGE_URI"] = f'{settings["REGION"]}-docker.pkg.dev/{settings["PROJECT_ID"]}/{settings["ARTIFACT_REGISTRY"]}/{settings["DEMO_BACKEND_SERVER_IMAGE"]}:{settings["DEMO_BACKEND_SERVER_TAG"]}'
   settings["AGENT_SOURCE_URI"] = AGENT_SOURCE_URI
   settings["ZONE"]=f'{settings["REGION"]}-b'
   if stdout:
@@ -224,13 +260,15 @@ def configure(c,
   service_accounts=True,
   vpc=True,
   storage=True,
+  artifact_repository=True,
+  connector=True,
 ):
   settings = source(c, config_file, build_dir, stdout=False)
 
   # Enable APIs:
   if apis:
     login(c, config_file, build_dir)
-    for api in ['compute','iam','dialogflow','servicedirectory','run','cloudbuild','cloudfunctions','artifactregistry','accesscontextmanager']:
+    for api in ['compute','iam','dialogflow','servicedirectory','run','cloudbuild','cloudfunctions','artifactregistry','accesscontextmanager', 'vpcaccess']:
       c.run(f'gcloud services enable {api}.googleapis.com')
 
   # Configure service identity for dialogflow:
@@ -266,9 +304,10 @@ def configure(c,
       settings["DEMO_BACKEND_SA_NAME"],
       build_dir/"keys"/settings["DEMO_BACKEND_SA_NAME"],
       settings["PROJECT_ID"],
-      roles = ['cloudfunctions.developer', 'browser', 'accesscontextmanager.policyEditor']
+      roles = ['cloudfunctions.admin', 'browser', 'accesscontextmanager.policyEditor', 'storage.objectViewer']
     )
-    c.run(f'gcloud access-context-manager policies add-iam-policy-binding --member=serviceAccount:{settings["SETUP_SA_NAME"]}@{settings["PROJECT_ID"]}.iam.gserviceaccount.com --role=roles/accesscontextmanager.policyEditor {settings["ACCESS_POLICY_NAME"]}', warn=True)
+    c.run(f'gcloud access-context-manager policies add-iam-policy-binding --member=serviceAccount:{settings["DEMO_BACKEND_SA_NAME"]}@{settings["PROJECT_ID"]}.iam.gserviceaccount.com --role=roles/accesscontextmanager.policyEditor {settings["ACCESS_POLICY_NAME"]}', warn=True)
+    c.run(f'gcloud iam service-accounts add-iam-policy-binding vpc-sc-demo-nicholascain11@appspot.gserviceaccount.com --member=serviceAccount:{settings["DEMO_BACKEND_SA_NAME"]}@{settings["PROJECT_ID"]}.iam.gserviceaccount.com --role=roles/iam.serviceAccountUser')
 
   # Configure Network:
   if vpc:
@@ -298,10 +337,17 @@ def configure(c,
       --nat-all-subnet-ip-ranges \
       --enable-logging \
       --router-region={settings["REGION"]}', warn=True)
+
+  if connector:
+    c.run(f'gcloud compute networks vpc-access connectors create demo-backend-connector --region {settings["REGION"]} --subnet {settings["SUBNET"]}', warn=True)
   
   if storage:
     login_sa(c, settings["SETUP_SA_NAME"], config_file, build_dir)
     c.run(f'gsutil mb gs://{settings["PROJECT_ID"]}', warn=True)
+
+  if artifact_repository:
+    c.run(f'gcloud auth configure-docker {settings["REGION"]}-docker.pkg.dev')
+    c.run(f'gcloud artifacts repositories create {settings["ARTIFACT_REGISTRY"]} --location {settings["REGION"]} --repository-format "docker"', warn=True)
 
 @task
 def deploy_webhook(c,
@@ -347,8 +393,8 @@ def update_webhook(c,
     authenticated = '--allow-unauthenticated'
   else:
     authenticated = '--no-allow-unauthenticated'
-  result = c.run(f'gcloud functions deploy --project={settings["PROJECT_ID"]} {settings["WEBHOOK_NAME"]} {authenticated} --ingress-settings={ingress_settings}', hide=True)
-  if result.stderr:
+  result = c.run(f'gcloud --quiet functions deploy --trigger-http --runtime {settings["WEBHOOK_RUNTIME"]} --project={settings["PROJECT_ID"]} {settings["WEBHOOK_NAME"]} {authenticated} --ingress-settings={ingress_settings} --source=gs://{settings["PROJECT_ID"]}/webhook.zip', hide=True)
+  if 'error' in result.stderr.lower():
     return {'status': 500, 'response':result.stderr.strip()}
   else:
     return {'status': 200, 'response':result.stdout.strip()}
@@ -403,12 +449,8 @@ def deploy_reverse_proxy_server(c,
   c.run(f'openssl x509 -in {ssl_crt} -out {ssl_der} -outform DER')
   c.run(f'gsutil cp -r {build_dir/"server/ssl"} gs://{settings["PROJECT_ID"]}')
 
-  # Build docker image
-  c.run(f'gcloud auth configure-docker {settings["REGION"]}-docker.pkg.dev')
-  c.run(f'gcloud artifacts repositories create {settings["REVERSE_PROXY_SERVER_REPO"]} --location {settings["REGION"]} --repository-format "docker"', warn=True)
-  c.run(f'gcloud builds submit {build_dir/"server"} --pack image={settings["REVERSE_PROXY_SERVER_IMAGE_URI"]} --gcs-log-dir=gs://{settings["PROJECT_ID"]}/{settings["REVERSE_PROXY_SERVER_IMAGE"]}-build-logs')
-
   # Deploy reverse proxy server
+  c.run(f'gcloud builds submit {build_dir/"server"} --pack image={settings["REVERSE_PROXY_SERVER_IMAGE_URI"]} --gcs-log-dir=gs://{settings["PROJECT_ID"]}/{settings["REVERSE_PROXY_SERVER_IMAGE"]}-build-logs')
   c.run(f'gcloud compute instances create {settings["REVERSE_PROXY_SERVER"]} \
     --project={settings["PROJECT_ID"]} \
     --zone={settings["ZONE"]} \
@@ -728,21 +770,17 @@ def deploy_demo(c,
 
   if debug:
     c.run(f'cd {build_dir/"demo_backend"} && sudo docker run -p 127.0.0.1:5000:5000 --rm -it $(sudo docker build -q .)', pty=True)
-
-'''
-curl -X POST \
-  -H "Authorization: Bearer $(gcloud auth print-identity-token)" \
-  -H "Content-Type:application/json" \
-  --data \
-  '{
-    "fulfillmentInfo":{
-      "tag":"validatePhoneLine"
-    },
-    "sessionInfo":{
-      "parameters":{
-        "phone_number":"123456"
-      }
-    }
-  }' \
-  https://accesscontextmanager.googleapis.com/v1/{servicePerimeter.name=accessPolicies/*/servicePerimeters/*}
-'''
+  else:
+    pass
+    c.run(f'gcloud builds submit {build_dir/"demo_backend"} --tag={settings["DEMO_BACKEND_SERVER_IMAGE_URI"]} --gcs-log-dir=gs://{settings["PROJECT_ID"]}/{settings["DEMO_BACKEND_SERVER_IMAGE"]}-build-logs')
+    c.run(f'gcloud run deploy --allow-unauthenticated {settings["DEMO_BACKEND_SERVER"]} \
+      --image {settings["DEMO_BACKEND_SERVER_IMAGE_URI"]} \
+      --platform managed \
+      --region {settings["REGION"]} \
+      --port=5000 \
+      --ingress=all \
+      --vpc-connector=demo-backend-connector \
+      --vpc-egress=all-traffic')
+  src = template_dir/"demo_backend"/"ping_examples.sh.j2"
+  tgt = build_dir/"demo_backend"/"ping_examples.sh"
+  apply_template(src, tgt, settings, backend_debug=debug)
