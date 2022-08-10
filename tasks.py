@@ -4,7 +4,7 @@ cd dialogflow-cx-webhook-reverse-proxy
 pip install pyinvoke
 
 # Project and access-policy don't need to exist yet:
-inv setup  --principal=nicholascain@cloudadvocacyorg.joonix.net --project-id=vpc-sc-demo-nicholascain11 --access-policy=nick_webhook_11
+inv setup  --principal=nicholascain@cloudadvocacyorg.joonix.net --project-id=vpc-sc-demo-nicholascain12 --access-policy=nick_webhook_12
 
 # Skip this if project exists
 inv init --new-project --organization 298490623289
@@ -213,7 +213,6 @@ def login(c, principal):
 @task
 def login_sa(c,
   sa_name,
-  config_file=pathlib.Path(CONFIG_FILE_DEFAULT),
   build_dir=pathlib.Path(BUILD_DIR_DEFAULT),
 ):
   c.run(f'gcloud auth activate-service-account --key-file={build_dir/"keys"/sa_name}', hide=True)
@@ -221,29 +220,13 @@ def login_sa(c,
 
 @task
 def init(c,
-  config_file=pathlib.Path(CONFIG_FILE_DEFAULT),
-  build_dir=pathlib.Path(BUILD_DIR_DEFAULT),
-  new_project=False,
-  organization=None,
-):
-  settings = source(c, config_file, build_dir, stdout=False)
-
-  if new_project:
-    if not organization:
-      raise RuntimeError('Need organization to create a project')
-    c.run(f'gcloud projects create {settings["PROJECT_ID"]} --organization={organization}')
-
-  c.run(f'gcloud --quiet config set project {settings["PROJECT_ID"]}')
-
-
-@task
-def billing(c,
+  project_id,
   account_id,
-  config_file=pathlib.Path(CONFIG_FILE_DEFAULT),
-  build_dir=pathlib.Path(BUILD_DIR_DEFAULT),
+  organization,
 ):
-  settings = source(c, config_file, build_dir, stdout=False)
-  c.run(f'gcloud beta billing projects link {settings["PROJECT_ID"]} --billing-account {account_id}')
+  c.run(f'gcloud projects create {project_id} --organization={organization}')
+  c.run(f'gcloud beta billing projects link {project_id} --billing-account {account_id}')
+  c.run(f'gcloud --quiet config set project {project_id}')
 
 
 @task
@@ -306,7 +289,7 @@ def configure(c,
 
   # Configure Network:
   if vpc:
-    login_sa(c, settings["SETUP_SA_NAME"], config_file, build_dir)
+    login_sa(c, settings["SETUP_SA_NAME"], build_dir)
     c.run(f'gcloud compute networks create {settings["NETWORK"]} --project={settings["PROJECT_ID"]} --subnet-mode=custom', warn=True)
     c.run(f'gcloud compute firewall-rules create allow --network {settings["NETWORK"]} --allow tcp:22,tcp:3389,icmp', warn=True)
     c.run(f'gcloud compute firewall-rules create allow-dialogflow \
@@ -334,15 +317,15 @@ def configure(c,
       --router-region={settings["REGION"]}', warn=True)
 
   if connector:
-    login_sa(c, settings["SETUP_SA_NAME"], config_file, build_dir)
+    login_sa(c, settings["SETUP_SA_NAME"], build_dir)
     c.run(f'gcloud compute networks vpc-access connectors create demo-backend-connector --region {settings["REGION"]} --subnet {settings["SUBNET"]}', warn=True)
   
   if storage:
-    login_sa(c, settings["SETUP_SA_NAME"], config_file, build_dir)
+    login_sa(c, settings["SETUP_SA_NAME"], build_dir)
     c.run(f'gsutil mb gs://{settings["PROJECT_ID"]}', warn=True)
 
   if artifact_repository:
-    login_sa(c, settings["SETUP_SA_NAME"], config_file, build_dir)
+    login_sa(c, settings["SETUP_SA_NAME"], build_dir)
     c.run(f'gcloud auth configure-docker {settings["REGION"]}-docker.pkg.dev')
     c.run(f'gcloud artifacts repositories create {settings["ARTIFACT_REGISTRY"]} --location {settings["REGION"]} --repository-format "docker"', warn=True)
 
@@ -407,7 +390,7 @@ def ping_webhook(c,
   settings = source(c, config_file, build_dir, stdout=False)
   if not sa_name:
     sa_name = settings["WEBHOOK_INVOKER_SA_NAME"]
-  login_sa(c, sa_name, config_file, build_dir)
+  login_sa(c, sa_name, build_dir)
   new_headers = {}
   new_headers['Content-type'] = 'application/json'
   if authenticated:
@@ -425,7 +408,7 @@ def deploy_reverse_proxy_server(c,
   template_dir=pathlib.Path('templates'),
 ):
   settings = source(c, config_file, build_dir, stdout=False)
-  login_sa(c, settings["SETUP_SA_NAME"], config_file, build_dir)
+  login_sa(c, settings["SETUP_SA_NAME"], build_dir)
 
   for filename in ['app.py', 'startup_script.sh']:
     src = template_dir/'server'/f'{filename}.j2'
@@ -484,7 +467,7 @@ def ping_webhook_from_reverse_proxy_server(c,
 ):
   settings = source(c, config_file, build_dir, stdout=False)
 
-  login_sa(c, settings["WEBHOOK_INVOKER_SA_NAME"], config_file, build_dir)
+  login_sa(c, settings["WEBHOOK_INVOKER_SA_NAME"], build_dir)
   token = c.run('gcloud auth print-identity-token', hide=True).stdout.strip()
 
   login(c, settings['PRINCIPAL'])
@@ -501,7 +484,7 @@ def ping_webhook_from_vpc(c,
 ):
   settings = source(c, config_file, build_dir, stdout=False)
 
-  login_sa(c, settings["WEBHOOK_INVOKER_SA_NAME"], config_file, build_dir)
+  login_sa(c, settings["WEBHOOK_INVOKER_SA_NAME"], build_dir)
   token = c.run('gcloud auth print-identity-token', hide=True).stdout.strip()
 
   login(c, settings['PRINCIPAL'])
@@ -517,7 +500,7 @@ def deploy_agent(c,
   build_dir=pathlib.Path(BUILD_DIR_DEFAULT),
 ):
   settings = source(c, config_file, build_dir, stdout=False)
-  login_sa(c, settings["SETUP_SA_NAME"], config_file, build_dir)
+  login_sa(c, settings["SETUP_SA_NAME"], build_dir)
 
   # Create service directory:
   c.run(f'gcloud service-directory namespaces create {settings["SERVICE_DIRECTORY_NAMESPACE"]} --location {settings["REGION"]}', warn=True)
@@ -550,7 +533,7 @@ def get_agents(c,
   build_dir=pathlib.Path(BUILD_DIR_DEFAULT),
 ):
   settings = source(c, config_file, build_dir, stdout=False)
-  login_sa(c, settings["SETUP_SA_NAME"], config_file, build_dir)
+  login_sa(c, settings["SETUP_SA_NAME"], build_dir)
 
   token = c.run('gcloud auth print-access-token', hide=True).stdout.strip()
   result = c.run(f'curl -s -X GET -H "Authorization: Bearer {token}" -H "x-goog-user-project: {settings["PROJECT_ID"]}" "https://{settings["REGION"]}-dialogflow.googleapis.com/v3/projects/{settings["PROJECT_ID"]}/locations/{settings["REGION"]}/agents"', warn=True, hide=True)
@@ -565,7 +548,7 @@ def get_webhooks(c,
   build_dir=pathlib.Path(BUILD_DIR_DEFAULT),
 ):
   settings = source(c, config_file, build_dir, stdout=False)
-  login_sa(c, settings["SETUP_SA_NAME"], config_file, build_dir)
+  login_sa(c, settings["SETUP_SA_NAME"], build_dir)
   token = c.run('gcloud auth print-access-token', hide=True).stdout.strip()
   result = c.run(f'curl -s -X GET -H "Authorization: Bearer {token}" -H "x-goog-user-project: {settings["PROJECT_ID"]}" "https://{settings["REGION"]}-dialogflow.googleapis.com/v3/{agent_name}/webhooks"', warn=True, hide=True)
   agents = json.loads(result.stdout.strip())
@@ -579,7 +562,7 @@ def get_flows(c,
   build_dir=pathlib.Path(BUILD_DIR_DEFAULT),
 ):
   settings = source(c, config_file, build_dir, stdout=False)
-  login_sa(c, settings["SETUP_SA_NAME"], config_file, build_dir)
+  login_sa(c, settings["SETUP_SA_NAME"], build_dir)
 
   token = c.run('gcloud auth print-access-token', hide=True).stdout.strip()
   result = c.run(f'curl -s -X GET -H "Authorization: Bearer {token}" -H "x-goog-user-project: {settings["PROJECT_ID"]}" "https://{settings["REGION"]}-dialogflow.googleapis.com/v3/{agent_name}/flows"', warn=True, hide=True)
@@ -594,7 +577,7 @@ def get_pages(c,
   build_dir=pathlib.Path(BUILD_DIR_DEFAULT),
 ):
   settings = source(c, config_file, build_dir, stdout=False)
-  login_sa(c, settings["SETUP_SA_NAME"], config_file, build_dir)
+  login_sa(c, settings["SETUP_SA_NAME"], build_dir)
 
   token = c.run('gcloud auth print-access-token', hide=True).stdout.strip()
   result = c.run(f'curl -s -X GET -H "Authorization: Bearer {token}" -H "x-goog-user-project: {settings["PROJECT_ID"]}" "https://{settings["REGION"]}-dialogflow.googleapis.com/v3/{flow_name}/pages"', warn=True, hide=True)
@@ -608,7 +591,7 @@ def ping_agent(c,
   build_dir=pathlib.Path(BUILD_DIR_DEFAULT),
 ):
   settings = source(c, config_file, build_dir, stdout=False)
-  login_sa(c, settings["SETUP_SA_NAME"], config_file, build_dir)
+  login_sa(c, settings["SETUP_SA_NAME"], build_dir)
 
   agent_name = get_agents(c)['Telecommunications']['name']
   flow_name = get_flows(c, agent_name)['Cruise Plan']['name']
@@ -646,7 +629,7 @@ def update_agent_webhook(c,
 ):
   # data = json.dumps({"displayName": "cxPrebuiltAgentsTelecom", "genericWebService": {"uri": settings["WEBHOOK_TRIGGER_URI"]}})
   settings = source(c, config_file, build_dir, stdout=False)
-  login_sa(c, settings["SETUP_SA_NAME"], config_file, build_dir)
+  login_sa(c, settings["SETUP_SA_NAME"], build_dir)
 
 
   token = c.run('gcloud auth print-access-token', hide=True).stdout.strip()
@@ -734,7 +717,7 @@ def update_security_perimeter(c,
   if restrict_cloudfunctions:
     restricted_services.append('cloudfunctions.googleapis.com')
 
-  login_sa(c, sa_name, config_file, build_dir)
+  login_sa(c, sa_name, build_dir)
   result = c.run(f'gcloud access-context-manager perimeters update {settings["SECURITY_PERIMETER"]} --policy={access_policy_id} --set-restricted-services={",".join(restricted_services)}', hide=True)
   if result.stderr:
     return {'status': 500, 'response':result.stderr.strip()}
