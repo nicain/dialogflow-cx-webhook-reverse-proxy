@@ -14,6 +14,7 @@ inv configure
 inv deploy-webhook
 inv deploy-reverse-proxy-server
 inv deploy-agent
+inv create-security-perimeter
 inv deploy-demo
 
 # Try running a ping script:
@@ -35,6 +36,14 @@ curl -X POST \
   -H "Authorization: Bearer $(gcloud auth print-identity-token)" \
   -d '{"allow_unauthenticated":false, "ingress_settings":"internal-only"}' \
   ${SERVER?}/update_webhook
+./build/demo_backend/ping_examples.sh
+
+Expected result: # 403, 403, 403, 200
+curl -X POST \
+  -H "Content-Type:application/json" \
+  -H "Authorization: Bearer $(gcloud auth print-identity-token)" \
+  -d '{"restrict_cloudfunctions":true, "restrict_dialogflow":false}' \
+  ${SERVER?}/update_security_perimeter
 ./build/demo_backend/ping_examples.sh
 '''
 
@@ -482,7 +491,7 @@ def deploy_reverse_proxy_server(c,
   c.run(f'gsutil cp -r {build_dir/"server/ssl"} gs://{settings["PROJECT_ID"]}')
 
   # Deploy reverse proxy server
-  # c.run(f'gcloud builds submit {build_dir/"server"} --pack image={settings["REVERSE_PROXY_SERVER_IMAGE_URI"]} --gcs-log-dir=gs://{settings["PROJECT_ID"]}/{settings["REVERSE_PROXY_SERVER_IMAGE"]}-build-logs')
+  c.run(f'gcloud builds submit {build_dir/"server"} --pack image={settings["REVERSE_PROXY_SERVER_IMAGE_URI"]} --gcs-log-dir=gs://{settings["PROJECT_ID"]}/{settings["REVERSE_PROXY_SERVER_IMAGE"]}-build-logs')
   c.run(f'gcloud compute instances create {settings["REVERSE_PROXY_SERVER"]} \
     --project={settings["PROJECT_ID"]} \
     --zone={settings["ZONE"]} \
@@ -575,9 +584,12 @@ def deploy_agent(c,
   c.run(f'curl -s -X POST -H "Authorization: Bearer {token}" -H "Content-Type:application/json" -H "x-goog-user-project: {settings["PROJECT_ID"]}" -d \'{data}\' "https://{settings["REGION"]}-dialogflow.googleapis.com/v3/{agent_name}:restore"')
 
   # Update the agent to query the webhook URI:
-  webhook_name = get_webhooks(c, agent_name)['cxPrebuiltAgentsTelecom']['name']
-  data = json.dumps({"displayName": "cxPrebuiltAgentsTelecom", "genericWebService": {"uri": settings["WEBHOOK_TRIGGER_URI"]}})
-  c.run(f'curl -s -X PATCH -H "Authorization: Bearer {token}" -H "Content-Type:application/json" -H "x-goog-user-project: {settings["PROJECT_ID"]}" -d \'{data}\' "https://{settings["REGION"]}-dialogflow.googleapis.com/v3/{webhook_name}"')
+  update_agent_webhook(c,
+    config_file=config_file,
+    build_dir=build_dir,
+    fulfillment='generic-web-service',
+    sa_name=settings["SETUP_SA_NAME"],
+  )
 
 
 @task
@@ -679,33 +691,42 @@ def ping_agent_from_vpc(c,
 def update_agent_webhook(c,
   config_file=pathlib.Path(CONFIG_FILE_DEFAULT),
   build_dir=pathlib.Path(BUILD_DIR_DEFAULT),
+  fulfillment='generic-web-service',
+  sa_name=None,
 ):
-  # data = json.dumps({"displayName": "cxPrebuiltAgentsTelecom", "genericWebService": {"uri": settings["WEBHOOK_TRIGGER_URI"]}})
   settings = source(c, config_file, build_dir, stdout=False)
-  login_sa(c, settings["SETUP_SA_NAME"], build_dir)
-
-
+  if not sa_name:
+    sa_name = settings["SETUP_SA_NAME"]
+  login_sa(c, sa_name, build_dir)
   token = c.run('gcloud auth print-access-token', hide=True).stdout.strip()
 
-  def b64Encode(msg_bytes):
-      base64_bytes = base64.b64encode(msg_bytes)
-      return base64_bytes.decode('ascii')
-
-  with open(build_dir/'server/ssl/server.der', 'rb') as f:
-    allowed_ca_cert = f.read()
   agent_name = get_agents(c)['Telecommunications']['name']
-  webhook_name = get_webhooks(c, agent_name)['cxPrebuiltAgentsTelecom']['name']
-  data = json.dumps({
-    "displayName": "cxPrebuiltAgentsTelecom", 
-    "serviceDirectory": {
-      "service": f'projects/{settings["PROJECT_ID"]}/locations/{settings["REGION"]}/namespaces/{settings["SERVICE_DIRECTORY_NAMESPACE"]}/services/{settings["SERVICE_DIRECTORY_SERVICE"]}',
-      "genericWebService": {
-        "uri": f'https://{settings["DOMAIN"]}',
-        "allowedCaCerts": [b64Encode(allowed_ca_cert)]
+  if fulfillment=='generic-web-service':
+    webhook_name = get_webhooks(c, agent_name)['cxPrebuiltAgentsTelecom']['name']
+    data = json.dumps({"displayName": "cxPrebuiltAgentsTelecom", "genericWebService": {"uri": settings["WEBHOOK_TRIGGER_URI"]}})
+    c.run(f'curl -s -X PATCH -H "Authorization: Bearer {token}" -H "Content-Type:application/json" -H "x-goog-user-project: {settings["PROJECT_ID"]}" -d \'{data}\' "https://{settings["REGION"]}-dialogflow.googleapis.com/v3/{webhook_name}"')
+
+  elif fulfillment=='service-directory':
+    def b64Encode(msg_bytes):
+        base64_bytes = base64.b64encode(msg_bytes)
+        return base64_bytes.decode('ascii')
+    c.run(f'gsutil cp gs://{settings["PROJECT_ID"]}/ssl/server.der /tmp/server.der')
+    with open('/tmp/server.der', 'rb') as f:
+      allowed_ca_cert = f.read()
+    webhook_name = get_webhooks(c, agent_name)['cxPrebuiltAgentsTelecom']['name']
+    data = json.dumps({
+      "displayName": "cxPrebuiltAgentsTelecom", 
+      "serviceDirectory": {
+        "service": f'projects/{settings["PROJECT_ID"]}/locations/{settings["REGION"]}/namespaces/{settings["SERVICE_DIRECTORY_NAMESPACE"]}/services/{settings["SERVICE_DIRECTORY_SERVICE"]}',
+        "genericWebService": {
+          "uri": f'https://{settings["DOMAIN"]}',
+          "allowedCaCerts": [b64Encode(allowed_ca_cert)]
+        }
       }
-    }
-  })
-  c.run(f'curl -s -X PATCH -H "Authorization: Bearer {token}" -H "Content-Type:application/json" -H "x-goog-user-project: {settings["PROJECT_ID"]}" -d \'{data}\' "https://{settings["REGION"]}-dialogflow.googleapis.com/v3/{webhook_name}"')
+    })
+    c.run(f'curl -s -X PATCH -H "Authorization: Bearer {token}" -H "Content-Type:application/json" -H "x-goog-user-project: {settings["PROJECT_ID"]}" -d \'{data}\' "https://{settings["REGION"]}-dialogflow.googleapis.com/v3/{webhook_name}"')
+  else:
+    raise RuntimeError(f'Fulfillment should be one of ["service-directory", "generic-web-service"], received: {fullment}')
 
 
 @task
@@ -727,6 +748,7 @@ def create_security_perimeter(c,
 ):
   settings = source(c, config_file, build_dir, stdout=False)
   set_project(c, settings["PROJECT_ID"])
+  login_sa(c, settings["SETUP_SA_NAME"], build_dir)
 
   # Get Access policy info:
   access_policy_id = settings["ACCESS_POLICY_NAME"].split('/')[1]
