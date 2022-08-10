@@ -4,7 +4,7 @@ cd dialogflow-cx-webhook-reverse-proxy
 pip install pyinvoke
 
 # If the home project doesn't already exist:
-inv init --project-id=vpc-sc-demo-nicholascain12 --organization=298490623289 --account-id=0145C0-557C58-C970F3
+inv init --principal=nicholascain@cloudadvocacyorg.joonix.net --project-id=vpc-sc-demo-nicholascain12 --organization=298490623289 --account-id=0145C0-557C58-C970F3
 
 # Project and access-policy don't need to exist yet:
 inv setup  --principal=nicholascain@cloudadvocacyorg.joonix.net --project-id=vpc-sc-demo-nicholascain12 --access-policy=nick_webhook_12
@@ -255,10 +255,12 @@ def set_project(c, project_id):
 
 @task
 def init(c,
+  principal,
   project_id,
   account_id,
   organization,
 ):
+  login(c, principal)
   c.run(f'gcloud projects create {project_id} --organization={organization}', warn=True)
   c.run(f'gcloud beta billing projects link {project_id} --billing-account {account_id}')
   set_project(c, project_id)
