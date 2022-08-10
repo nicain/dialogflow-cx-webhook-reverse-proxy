@@ -9,9 +9,6 @@ inv init --project-id=vpc-sc-demo-nicholascain12 --organization=298490623289 --a
 # Project and access-policy don't need to exist yet:
 inv setup  --principal=nicholascain@cloudadvocacyorg.joonix.net --project-id=vpc-sc-demo-nicholascain12 --access-policy=nick_webhook_12
 
-# Skip this if billing already configured for project
-inv billing 0145C0-557C58-C970F3
-
 inv configure
 inv deploy-webhook
 inv deploy-reverse-proxy-server
@@ -20,6 +17,25 @@ inv deploy-reverse-proxy-server
 inv deploy-agent
 
 inv deploy-demo
+
+# Try running a ping script:
+gcloud auth activate-service-account --key-file=build/keys/demo-backend
+export SERVER=$(gcloud run services describe demo-backend --platform managed --region us-central1 --format "value(status.url)")
+
+Expected result: # 200, 200, 403, 200
+curl -X POST \
+  -H "Content-Type:application/json" \
+  -H "Authorization: Bearer $(gcloud auth print-identity-token)" \
+  -d '{"allow_unauthenticated":true, "ingress_settings":"all"}' \
+  ${SERVER?}/update_webhook
+./build/demo_backend/ping_examples.sh
+
+Expected result: # 403, 403, 403, 200
+curl -X POST \
+  -H "Content-Type:application/json" \
+  -H "Authorization: Bearer $(gcloud auth print-identity-token)" \
+  -d '{"allow_unauthenticated":false, "ingress_settings":"internal-only"}' \
+  ${SERVER?}/update_webhook
 '''
 
 
@@ -49,7 +65,11 @@ REVERSE_PROXY_SERVER_DEFAULT = 'webhook-server'
 REVERSE_PROXY_SERVER_TAG_DEFAULT = 'latest'
 DEMO_BACKEND_SERVER_DEFAULT = 'demo-backend'
 DEMO_BACKEND_SERVER_TAG_DEFAULT = 'latest'
+DEMO_BACKEND_VPC_CONNECTOR_DEFAULT = 'demo-backend-connector'
+DEMO_BACKEND_VPC_CONNECTOR_SUBNET_DEFAULT = 'demo-backend-subnet'
+DEMO_BACKEND_VPC_CONNECTOR_SUBNET_RANGE_DEFAULT = '10.10.10.0/28'
 REVERSE_PROXY_SERVER_VM_TAG_DEFAULT = 'webhook-reverse-proxy-vm'
+REVERSE_PROXY_SERVER_IP_NAME_DEFAULT = 'webhook-reverse-proxy-addr'
 REVERSE_PROXY_SERVER_IP_DEFAULT = '10.10.20.2'
 SERVICE_DIRECTORY_NAMESPACE_DEFAULT = 'df-namespace'
 SERVICE_DIRECTORY_SERVICE_DEFAULT = 'df-service'
@@ -104,12 +124,16 @@ def setup(c,
   reverse_proxy_server=REVERSE_PROXY_SERVER_DEFAULT,
   reverse_proxy_server_tag=REVERSE_PROXY_SERVER_TAG_DEFAULT,
   reverse_proxy_server_vm_tag=REVERSE_PROXY_SERVER_VM_TAG_DEFAULT,
+  reverse_proxy_server_ip_name=REVERSE_PROXY_SERVER_IP_NAME_DEFAULT,
   reverse_proxy_server_ip=REVERSE_PROXY_SERVER_IP_DEFAULT,
   service_directory_namespace = SERVICE_DIRECTORY_NAMESPACE_DEFAULT,
   service_directory_service = SERVICE_DIRECTORY_SERVICE_DEFAULT,
   service_directory_endpoint = SERVICE_DIRECTORY_ENDPOINT_DEFAULT,
   security_perimeter = SECURITY_PERIMETER_DEFAULT,
   demo_backend_sa_name = DEMO_BACKEND_SA_NAME_DEFAULT,
+  demo_backend_vpc_connector = DEMO_BACKEND_VPC_CONNECTOR_DEFAULT,
+  demo_backend_vpc_connector_subnet = DEMO_BACKEND_VPC_CONNECTOR_SUBNET_DEFAULT,
+  demo_backend_vpc_connector_subnet_range = DEMO_BACKEND_VPC_CONNECTOR_SUBNET_RANGE_DEFAULT,
   artifact_registry = ARTIFACT_REGISTRY_DEFAULT,
   demo_backend_server = DEMO_BACKEND_SERVER_DEFAULT,
   demo_backend_server_tag = DEMO_BACKEND_SERVER_TAG_DEFAULT,
@@ -124,6 +148,7 @@ def setup(c,
   c.run(f"mkdir -p {build_dir}/demo_backend")
 
   login(c, principal)
+  set_project(c, project_id)
   headers = {}
   token = c.run('gcloud auth print-access-token', hide=True).stdout.strip()
   headers['Authorization'] = f'Bearer {token}'
@@ -162,6 +187,7 @@ def setup(c,
       'REVERSE_PROXY_SERVER':reverse_proxy_server,
       'REVERSE_PROXY_SERVER_TAG':reverse_proxy_server_tag,
       'REVERSE_PROXY_SERVER_VM_TAG':reverse_proxy_server_vm_tag,
+      'REVERSE_PROXY_SERVER_IP_NAME':reverse_proxy_server_ip_name,
       'REVERSE_PROXY_SERVER_IP':reverse_proxy_server_ip,
       'SERVICE_DIRECTORY_NAMESPACE':service_directory_namespace,
       'SERVICE_DIRECTORY_SERVICE':service_directory_service,
@@ -172,6 +198,9 @@ def setup(c,
       'ARTIFACT_REGISTRY':artifact_registry,
       'DEMO_BACKEND_SERVER':demo_backend_server,
       'DEMO_BACKEND_SERVER_TAG':demo_backend_server_tag,
+      'DEMO_BACKEND_VPC_CONNECTOR':demo_backend_vpc_connector,
+      'DEMO_BACKEND_VPC_CONNECTOR_SUBNET':demo_backend_vpc_connector_subnet,
+      'DEMO_BACKEND_VPC_CONNECTOR_SUBNET_RANGE':demo_backend_vpc_connector_subnet_range,
     }, f, indent=2, sort_keys=True)
     f.write('\n')
 
@@ -220,6 +249,9 @@ def login_sa(c,
 ):
   c.run(f'gcloud auth activate-service-account --key-file={build_dir/"keys"/sa_name}', hide=True)
 
+@task
+def set_project(c, project_id):
+  c.run(f'gcloud --quiet config set project {project_id}')
 
 @task
 def init(c,
@@ -229,7 +261,7 @@ def init(c,
 ):
   c.run(f'gcloud projects create {project_id} --organization={organization}', warn=True)
   c.run(f'gcloud beta billing projects link {project_id} --billing-account {account_id}')
-  c.run(f'gcloud --quiet config set project {project_id}')
+  set_project(c, project_id)
 
 
 @task
@@ -245,11 +277,12 @@ def configure(c,
   connector=True,
 ):
   settings = source(c, config_file, build_dir, stdout=False)
+  set_project(c, settings["PROJECT_ID"])
 
   # Enable APIs:
   if apis:
     login(c, settings['PRINCIPAL'])
-    for api in ['compute','iam','dialogflow','servicedirectory','run','cloudbuild','cloudfunctions','artifactregistry','accesscontextmanager', 'vpcaccess']:
+    for api in ['compute','iam','dialogflow','servicedirectory','run','cloudbuild','cloudfunctions','artifactregistry','accesscontextmanager', 'vpcaccess', 'appengine']:
       c.run(f'gcloud services enable {api}.googleapis.com')
 
   # Configure service identity for dialogflow:
@@ -266,7 +299,7 @@ def configure(c,
       settings["SETUP_SA_NAME"],
       build_dir/"keys"/settings["SETUP_SA_NAME"],
       settings["PROJECT_ID"],
-      roles = ['storage.admin', 'compute.admin', 'iam.serviceAccountUser', 'cloudfunctions.developer', 'artifactregistry.admin', 'cloudbuild.builds.editor', 'dialogflow.admin', 'serviceusage.serviceUsageConsumer', 'browser']
+      roles = ['storage.admin', 'compute.admin', 'iam.serviceAccountUser', 'cloudfunctions.admin', 'artifactregistry.admin', 'cloudbuild.builds.editor', 'dialogflow.admin', 'serviceusage.serviceUsageConsumer', 'browser', 'vpcaccess.admin', 'servicedirectory.admin']
     )
     c.run(f'gcloud access-context-manager policies add-iam-policy-binding --member=serviceAccount:{settings["SETUP_SA_NAME"]}@{settings["PROJECT_ID"]}.iam.gserviceaccount.com --role=roles/accesscontextmanager.policyEditor {settings["ACCESS_POLICY_NAME"]}', warn=True)
     set_up_service_account(c,
@@ -288,7 +321,7 @@ def configure(c,
       roles = ['cloudfunctions.admin', 'browser', 'accesscontextmanager.policyEditor', 'storage.objectViewer']
     )
     c.run(f'gcloud access-context-manager policies add-iam-policy-binding --member=serviceAccount:{settings["DEMO_BACKEND_SA_NAME"]}@{settings["PROJECT_ID"]}.iam.gserviceaccount.com --role=roles/accesscontextmanager.policyEditor {settings["ACCESS_POLICY_NAME"]}', warn=True)
-    c.run(f'gcloud iam service-accounts add-iam-policy-binding vpc-sc-demo-nicholascain11@appspot.gserviceaccount.com --member=serviceAccount:{settings["DEMO_BACKEND_SA_NAME"]}@{settings["PROJECT_ID"]}.iam.gserviceaccount.com --role=roles/iam.serviceAccountUser')
+    c.run(f'gcloud iam service-accounts add-iam-policy-binding {settings["PROJECT_ID"]}@appspot.gserviceaccount.com --member=serviceAccount:{settings["DEMO_BACKEND_SA_NAME"]}@{settings["PROJECT_ID"]}.iam.gserviceaccount.com --role=roles/iam.serviceAccountUser')
 
   # Configure Network:
   if vpc:
@@ -302,13 +335,19 @@ def configure(c,
       --action=ALLOW \
       --rules=tcp:443 \
       --source-ranges=35.199.192.0/19 \
-      --target-tags={settings["REVERSE_PROXY_SERVER_VM_TAG"]}')
+      --target-tags={settings["REVERSE_PROXY_SERVER_VM_TAG"]}', warn=True)
     c.run(f'gcloud compute networks subnets create {settings["SUBNET"]} \
       --project={settings["PROJECT_ID"]} \
       --network={settings["NETWORK"]} \
       --region={settings["REGION"]} \
       --enable-private-ip-google-access \
       --range={settings["SUBNET_RANGE"]}', warn=True)
+    c.run(f'gcloud compute networks subnets create {settings["DEMO_BACKEND_VPC_CONNECTOR_SUBNET"]} \
+      --project={settings["PROJECT_ID"]} \
+      --network={settings["NETWORK"]} \
+      --region={settings["REGION"]} \
+      --enable-private-ip-google-access \
+      --range={settings["DEMO_BACKEND_VPC_CONNECTOR_SUBNET_RANGE"]}', warn=True)
     c.run(f'gcloud compute routers create nat-router \
       --network={settings["NETWORK"]} \
       --region={settings["REGION"]}', warn=True)
@@ -318,10 +357,15 @@ def configure(c,
       --nat-all-subnet-ip-ranges \
       --enable-logging \
       --router-region={settings["REGION"]}', warn=True)
+    c.run(f'gcloud compute addresses create {settings["REVERSE_PROXY_SERVER_IP_NAME"]} \
+      --subnet={settings["SUBNET"]} \
+      --purpose=GCE_ENDPOINT \
+      --addresses={settings["REVERSE_PROXY_SERVER_IP"]} \
+      --region={settings["REGION"]}')
 
   if connector:
     login_sa(c, settings["SETUP_SA_NAME"], build_dir)
-    c.run(f'gcloud compute networks vpc-access connectors create demo-backend-connector --region {settings["REGION"]} --subnet {settings["SUBNET"]}', warn=True)
+    c.run(f'gcloud compute networks vpc-access connectors create {settings["DEMO_BACKEND_VPC_CONNECTOR"]} --region {settings["REGION"]} --subnet {settings["DEMO_BACKEND_VPC_CONNECTOR_SUBNET"]}', warn=True)
   
   if storage:
     login_sa(c, settings["SETUP_SA_NAME"], build_dir)
@@ -339,11 +383,10 @@ def deploy_webhook(c,
   template_dir=pathlib.Path('templates'),
   allow_unauthenticated=True,
   ingress_settings='all',
-  sa_name=None,
 ):
   settings = source(c, config_file, build_dir, stdout=False)
-  if not sa_name:
-    sa_name = settings["SETUP_SA_NAME"]
+  set_project(c, settings["PROJECT_ID"])
+  login_sa(c, settings["SETUP_SA_NAME"], build_dir)
 
   src = template_dir/"webhook"/"main.py.j2"
   tgt = build_dir/"webhook"/"main.py"
@@ -370,6 +413,7 @@ def update_webhook(c,
   sa_name=None,
 ):
   settings = source(c, config_file, build_dir, stdout=False)
+  set_project(c, settings["PROJECT_ID"])
   if not sa_name:
     sa_name = settings["SETUP_SA_NAME"]
   if allow_unauthenticated:
@@ -391,6 +435,7 @@ def ping_webhook(c,
   sa_name=None,
 ):
   settings = source(c, config_file, build_dir, stdout=False)
+  set_project(c, settings["PROJECT_ID"])
   if not sa_name:
     sa_name = settings["WEBHOOK_INVOKER_SA_NAME"]
   login_sa(c, sa_name, build_dir)
@@ -411,6 +456,7 @@ def deploy_reverse_proxy_server(c,
   template_dir=pathlib.Path('templates'),
 ):
   settings = source(c, config_file, build_dir, stdout=False)
+  set_project(c, settings["PROJECT_ID"])
   login_sa(c, settings["SETUP_SA_NAME"], build_dir)
 
   for filename in ['app.py', 'startup_script.sh']:
@@ -433,13 +479,13 @@ def deploy_reverse_proxy_server(c,
   c.run(f'gsutil cp -r {build_dir/"server/ssl"} gs://{settings["PROJECT_ID"]}')
 
   # Deploy reverse proxy server
-  c.run(f'gcloud builds submit {build_dir/"server"} --pack image={settings["REVERSE_PROXY_SERVER_IMAGE_URI"]} --gcs-log-dir=gs://{settings["PROJECT_ID"]}/{settings["REVERSE_PROXY_SERVER_IMAGE"]}-build-logs')
+  # c.run(f'gcloud builds submit {build_dir/"server"} --pack image={settings["REVERSE_PROXY_SERVER_IMAGE_URI"]} --gcs-log-dir=gs://{settings["PROJECT_ID"]}/{settings["REVERSE_PROXY_SERVER_IMAGE"]}-build-logs')
   c.run(f'gcloud compute instances create {settings["REVERSE_PROXY_SERVER"]} \
     --project={settings["PROJECT_ID"]} \
     --zone={settings["ZONE"]} \
     --tags={settings["REVERSE_PROXY_SERVER_VM_TAG"]} \
     --scopes=cloud-platform \
-    --create-disk=auto-delete=yes,boot=yes,device-name=instance-1,image=projects/debian-cloud/global/images/debian-10-buster-v20220406,mode=rw,size=10,type=projects/{settings["PROJECT_ID"]}/zones/{settings["ZONE"]}/diskTypes/pd-balanced \
+    --create-disk=auto-delete=yes,boot=yes,device-name=instance-1,image=projects/debian-cloud/global/images/debian-10-buster-v20220719,mode=rw,size=10,type=projects/{settings["PROJECT_ID"]}/zones/{settings["ZONE"]}/diskTypes/pd-balanced \
     --network-interface=network={settings["NETWORK"]},subnet={settings["SUBNET"]},no-address,private-network-ip={settings["REVERSE_PROXY_SERVER_IP"]} \
     --metadata-from-file=startup-script={build_dir/"server/startup_script.sh"}')
 
@@ -503,6 +549,7 @@ def deploy_agent(c,
   build_dir=pathlib.Path(BUILD_DIR_DEFAULT),
 ):
   settings = source(c, config_file, build_dir, stdout=False)
+  set_project(c, settings["PROJECT_ID"])
   login_sa(c, settings["SETUP_SA_NAME"], build_dir)
 
   # Create service directory:
@@ -516,13 +563,13 @@ def deploy_agent(c,
     --port=443 \
     --network=projects/{settings["PROJECT_NUMBER"]}/locations/global/networks/{settings["NETWORK"]}', warn=True)
 
-  # # Create Telecommunications agent:
+  # Create Telecommunications agent:
   token = c.run('gcloud auth print-access-token', hide=True).stdout.strip()
-  # data = json.dumps({"displayName": "Telecommunications","defaultLanguageCode": "en","timeZone": "America/Chicago"})
-  # c.run(f'curl -s -X POST -H "Authorization: Bearer {token}" -H "Content-Type:application/json" -H "x-goog-user-project: {settings["PROJECT_ID"]}" -d \'{data}\' "https://{settings["REGION"]}-dialogflow.googleapis.com/v3/projects/{settings["PROJECT_ID"]}/locations/{settings["REGION"]}/agents"', warn=True)
+  data = json.dumps({"displayName": "Telecommunications","defaultLanguageCode": "en","timeZone": "America/Chicago"})
+  c.run(f'curl -s -X POST -H "Authorization: Bearer {token}" -H "Content-Type:application/json" -H "x-goog-user-project: {settings["PROJECT_ID"]}" -d \'{data}\' "https://{settings["REGION"]}-dialogflow.googleapis.com/v3/projects/{settings["PROJECT_ID"]}/locations/{settings["REGION"]}/agents"', warn=True)
   agent_name = get_agents(c)['Telecommunications']['name']
-  # data = json.dumps({"agentUri": AGENT_SOURCE_URI})
-  # c.run(f'curl -s -X POST -H "Authorization: Bearer {token}" -H "Content-Type:application/json" -H "x-goog-user-project: {settings["PROJECT_ID"]}" -d \'{data}\' "https://{settings["REGION"]}-dialogflow.googleapis.com/v3/{agent_name}:restore"')
+  data = json.dumps({"agentUri": AGENT_SOURCE_URI})
+  c.run(f'curl -s -X POST -H "Authorization: Bearer {token}" -H "Content-Type:application/json" -H "x-goog-user-project: {settings["PROJECT_ID"]}" -d \'{data}\' "https://{settings["REGION"]}-dialogflow.googleapis.com/v3/{agent_name}:restore"')
 
   # Update the agent to query the webhook URI:
   webhook_name = get_webhooks(c, agent_name)['cxPrebuiltAgentsTelecom']['name']
@@ -641,7 +688,6 @@ def update_agent_webhook(c,
       base64_bytes = base64.b64encode(msg_bytes)
       return base64_bytes.decode('ascii')
 
-  service = f'projects/vpc-sc-demo-nicholascain10/locations/us-central1/namespaces/df-namespace/services/df-service'
   with open(build_dir/'server/ssl/server.der', 'rb') as f:
     allowed_ca_cert = f.read()
   agent_name = get_agents(c)['Telecommunications']['name']
@@ -649,7 +695,7 @@ def update_agent_webhook(c,
   data = json.dumps({
     "displayName": "cxPrebuiltAgentsTelecom", 
     "serviceDirectory": {
-      "service": service,
+      "service": f'projects/{settings["PROJECT_ID"]}/locations/{settings["REGION"]}/namespaces/{settings["SERVICE_DIRECTORY_NAMESPACE"]}/services/{settings["SERVICE_DIRECTORY_SERVICE"]}',
       "genericWebService": {
         "uri": f'https://{settings["DOMAIN"]}',
         "allowedCaCerts": [b64Encode(allowed_ca_cert)]
@@ -657,7 +703,6 @@ def update_agent_webhook(c,
     }
   })
   c.run(f'curl -s -X PATCH -H "Authorization: Bearer {token}" -H "Content-Type:application/json" -H "x-goog-user-project: {settings["PROJECT_ID"]}" -d \'{data}\' "https://{settings["REGION"]}-dialogflow.googleapis.com/v3/{webhook_name}"')
-
 
 
 @task
@@ -673,14 +718,12 @@ def get_project_ancestor(c,
 
 
 @task
-
-
-@task
 def create_security_perimeter(c,
   config_file=pathlib.Path(CONFIG_FILE_DEFAULT),
   build_dir=pathlib.Path(BUILD_DIR_DEFAULT),
 ):
   settings = source(c, config_file, build_dir, stdout=False)
+  set_project(c, settings["PROJECT_ID"])
 
   # Get Access policy info:
   access_policy_id = settings["ACCESS_POLICY_NAME"].split('/')[1]
@@ -708,6 +751,7 @@ def update_security_perimeter(c,
   sa_name=None,
 ):
   settings = source(c, config_file, build_dir, stdout=False)
+  set_project(c, settings["PROJECT_ID"])
   if not sa_name:
     sa_name = settings["SETUP_SA_NAME"]
 
@@ -733,9 +777,11 @@ def deploy_demo(c,
   build_dir=pathlib.Path(BUILD_DIR_DEFAULT),
   template_dir=pathlib.Path('templates'),
   config_file=pathlib.Path(CONFIG_FILE_DEFAULT),
-  debug=True,
+  prod=True,
 ):
   settings = source(c, config_file, build_dir, stdout=False)
+  set_project(c, settings["PROJECT_ID"])
+  login_sa(c, settings["SETUP_SA_NAME"], build_dir)
 
   for filename in ['Dockerfile', 'Procfile', 'requirements.txt']:
     c.run(f'cp {template_dir/"demo_backend"/filename} {build_dir/"demo_backend"/filename}')
@@ -744,15 +790,11 @@ def deploy_demo(c,
     tgt = build_dir/'demo_backend'/f'{filename}'
     apply_template(src, tgt, settings)
 
-
   c.run(f'cp tasks.py {build_dir/"demo_backend/tasks.py"}')
   c.run(f'cp {build_dir/config_file} {build_dir/"demo_backend/config.json"}')
   c.run(f'cp {build_dir/"keys"/settings["DEMO_BACKEND_SA_NAME"]} {build_dir/"demo_backend"/settings["DEMO_BACKEND_SA_NAME"]}')
 
-  if debug:
-    c.run(f'cd {build_dir/"demo_backend"} && sudo docker run -p 127.0.0.1:5000:5000 --rm -it $(sudo docker build -q .)', pty=True)
-  else:
-    pass
+  if prod:
     c.run(f'gcloud builds submit {build_dir/"demo_backend"} --tag={settings["DEMO_BACKEND_SERVER_IMAGE_URI"]} --gcs-log-dir=gs://{settings["PROJECT_ID"]}/{settings["DEMO_BACKEND_SERVER_IMAGE"]}-build-logs')
     c.run(f'gcloud run deploy --allow-unauthenticated {settings["DEMO_BACKEND_SERVER"]} \
       --image {settings["DEMO_BACKEND_SERVER_IMAGE_URI"]} \
@@ -760,8 +802,10 @@ def deploy_demo(c,
       --region {settings["REGION"]} \
       --port=5000 \
       --ingress=all \
-      --vpc-connector=demo-backend-connector \
+      --vpc-connector={settings["DEMO_BACKEND_VPC_CONNECTOR"]} \
       --vpc-egress=all-traffic')
+  else:
+    c.run(f'cd {build_dir/"demo_backend"} && sudo docker run -p 127.0.0.1:5000:5000 --rm -it $(sudo docker build -q .)', pty=True)
   src = template_dir/"demo_backend"/"ping_examples.sh.j2"
   tgt = build_dir/"demo_backend"/"ping_examples.sh"
-  apply_template(src, tgt, settings, backend_debug=debug)
+  apply_template(src, tgt, settings, backend_debug=not prod)

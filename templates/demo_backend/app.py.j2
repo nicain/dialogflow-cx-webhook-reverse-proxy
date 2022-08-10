@@ -19,7 +19,7 @@ SA_NAME="{{DEMO_BACKEND_SA_NAME}}"
 BUILD_DIR=pathlib.Path('/app')
 
 
-tasks.login_sa(invoke.Context(), 'demo-backend', config_file=CONFIG_FILE, build_dir=BUILD_DIR)
+tasks.login_sa(invoke.Context(), 'demo-backend', build_dir=BUILD_DIR)
 
 authorized_emails = [
     '{{PRINCIPAL}}',
