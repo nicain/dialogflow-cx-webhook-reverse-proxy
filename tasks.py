@@ -10,17 +10,16 @@ inv init --principal=nicholascain@cloudadvocacyorg.joonix.net --project-id=vpc-s
 inv setup  --principal=nicholascain@cloudadvocacyorg.joonix.net --project-id=vpc-sc-demo-nicholascain12 --access-policy=nick_webhook_12
 
 inv configure
+# In dialogflow, urn on location services for the region before continuing:
 inv deploy-webhook
 inv deploy-reverse-proxy-server
-
-# Turn on location services for agent before running this step:
 inv deploy-agent
-
 inv deploy-demo
 
 # Try running a ping script:
 gcloud auth activate-service-account --key-file=build/keys/demo-backend
 export SERVER=$(gcloud run services describe demo-backend --platform managed --region us-central1 --format "value(status.url)")
+chmod +x ./build/demo_backend/ping_examples.sh
 
 Expected result: # 200, 200, 403, 200
 curl -X POST \
@@ -36,6 +35,7 @@ curl -X POST \
   -H "Authorization: Bearer $(gcloud auth print-identity-token)" \
   -d '{"allow_unauthenticated":false, "ingress_settings":"internal-only"}' \
   ${SERVER?}/update_webhook
+./build/demo_backend/ping_examples.sh
 '''
 
 
