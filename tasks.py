@@ -157,6 +157,7 @@ def setup(c,
     ancestor_type='organization')
   project_number = c.run(f'gcloud projects list --filter={project_id} --format="value(PROJECT_NUMBER)"', hide=True).stdout.strip()
   query = f'parent=organizations/{organization_id}'
+  c.run(f'gcloud services enable accesscontextmanager.googleapis.com')
   response_json = requests.get(f"https://accesscontextmanager.googleapis.com/v1/accessPolicies?{query}", headers=headers).json()
   access_policies = {p['title']:p for p in response_json['accessPolicies']}
   if access_policy not in access_policies:
