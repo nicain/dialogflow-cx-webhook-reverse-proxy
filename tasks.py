@@ -130,19 +130,23 @@ def setup(c,
   organization_id = get_project_ancestor(c,
     project_id,
     ancestor_type='organization')
+  project_number = c.run(f'gcloud projects list --filter={project_id} --format="value(PROJECT_NUMBER)"', hide=True).stdout.strip()
   query = f'parent=organizations/{organization_id}'
   response_json = requests.get(f"https://accesscontextmanager.googleapis.com/v1/accessPolicies?{query}", headers=headers).json()
   access_policies = {p['title']:p for p in response_json['accessPolicies']}
   if access_policy not in access_policies:
-    raise ValueError(f'Policy title "{access_policy}" not found for organization: "organizations/{organization_id}". Please contact an administrator.')
-  else:
-    access_policy_name = access_policies[access_policy]["name"]
+    c.run(f'gcloud access-context-manager policies create --organization=organizations/{organization_id} --title={access_policy} --scopes=projects/{project_number}')
+    response_json = requests.get(f"https://accesscontextmanager.googleapis.com/v1/accessPolicies?{query}", headers=headers).json()
+    access_policies = {p['title']:p for p in response_json['accessPolicies']}
+
+  access_policy_name = access_policies[access_policy]["name"]
 
   with open(build_dir / config_file, 'w', encoding='utf-8') as f:
     json.dump({
       'PRINCIPAL':principal,
       'PROJECT_ID':project_id,
       'ACCESS_POLICY':access_policy,
+      'PROJECT_NUMBER':project_number,
       'CONFIG_FILE':config_file,
       'REGION':region,
       'WEBHOOK_NAME':webhook_name,
@@ -192,7 +196,6 @@ def source(c,
 ):
   with open(build_dir / config_file, 'r', encoding='utf-8') as f:
     settings = json.load(f)
-  settings["PROJECT_NUMBER"] = c.run(f'gcloud projects list --filter={settings["PROJECT_ID"]} --format="value(PROJECT_NUMBER)"', hide=True).stdout.strip()
   settings["WEBHOOK_TRIGGER_URI"] = f'https://{settings["REGION"]}-{settings["PROJECT_ID"]}.cloudfunctions.net/{settings["WEBHOOK_NAME"]}'
   settings["REVERSE_PROXY_SERVER_IMAGE"] = f'{settings["REVERSE_PROXY_SERVER"]}-image'
   settings["REVERSE_PROXY_SERVER_IMAGE_URI"] = f'{settings["REGION"]}-docker.pkg.dev/{settings["PROJECT_ID"]}/{settings["ARTIFACT_REGISTRY"]}/{settings["REVERSE_PROXY_SERVER_IMAGE"]}:{settings["REVERSE_PROXY_SERVER_TAG"]}'
