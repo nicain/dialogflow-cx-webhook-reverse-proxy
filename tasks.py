@@ -38,13 +38,37 @@ curl -X POST \
   ${SERVER?}/update_webhook
 ./build/demo_backend/ping_examples.sh
 
-Expected result: # 403, 403, 403, 200
+Expected result: # 403, 403, 403, 403
 curl -X POST \
   -H "Content-Type:application/json" \
   -H "Authorization: Bearer $(gcloud auth print-identity-token)" \
-  -d '{"restrict_cloudfunctions":true, "restrict_dialogflow":false}' \
+  -d '{"restrict_cloudfunctions":false, "restrict_dialogflow":false}' \
   ${SERVER?}/update_security_perimeter
 ./build/demo_backend/ping_examples.sh
+
+
+curl -X GET ${SERVER?}/ping_agent -H "Authorization: Bearer $(gcloud auth print-identity-token)"
+
+
+# Test Dialogflow connection:
+curl -s -X GET -H "Authorization: Bearer $(gcloud auth print-access-token)" \
+  -H "Content-Type:application/json" \
+  -H "x-goog-user-project: ${PROJECT_ID}" \
+  "https://$(inv get REGION)-dialogflow.googleapis.com/v3/projects/$(inv get PROJECT_ID)/locations/$(inv get REGION)/agents"
+
+
+curl -X POST \
+  -H "Content-Type:application/json" \
+  -H "Authorization: Bearer $(gcloud auth print-identity-token)" \
+  -d '{"allow_unauthenticated":true}' \
+  ${SERVER?}/update_webhook_access
+
+curl -X POST \
+  -H "Content-Type:application/json" \
+  -H "Authorization: Bearer $(gcloud auth print-identity-token)" \
+  -d '{"internal_only":false}' \
+  ${SERVER?}/update_webhook_ingress
+
 '''
 
 
@@ -330,7 +354,7 @@ def configure(c,
       settings["DEMO_BACKEND_SA_NAME"],
       build_dir/"keys"/settings["DEMO_BACKEND_SA_NAME"],
       settings["PROJECT_ID"],
-      roles = ['cloudfunctions.admin', 'browser', 'accesscontextmanager.policyEditor', 'storage.objectViewer']
+      roles = ['cloudfunctions.admin', 'browser', 'accesscontextmanager.policyEditor', 'storage.objectViewer', 'dialogflow.admin', 'serviceusage.serviceUsageConsumer']
     )
     c.run(f'gcloud access-context-manager policies add-iam-policy-binding --member=serviceAccount:{settings["DEMO_BACKEND_SA_NAME"]}@{settings["PROJECT_ID"]}.iam.gserviceaccount.com --role=roles/accesscontextmanager.policyEditor {settings["ACCESS_POLICY_NAME"]}', warn=True)
     c.run(f'gcloud iam service-accounts add-iam-policy-binding {settings["PROJECT_ID"]}@appspot.gserviceaccount.com --member=serviceAccount:{settings["DEMO_BACKEND_SA_NAME"]}@{settings["PROJECT_ID"]}.iam.gserviceaccount.com --role=roles/iam.serviceAccountUser')
@@ -417,22 +441,67 @@ def deploy_webhook(c,
 
 
 @task
-def update_webhook(c,
+def update_webhook_ingress(c,
+  internal_only=True,
   config_file=pathlib.Path(CONFIG_FILE_DEFAULT),
   build_dir=pathlib.Path(BUILD_DIR_DEFAULT),
-  allow_unauthenticated=True,
-  ingress_settings='all',
   sa_name=None,
 ):
   settings = source(c, config_file, build_dir, stdout=False)
   set_project(c, settings["PROJECT_ID"])
   if not sa_name:
     sa_name = settings["SETUP_SA_NAME"]
-  if allow_unauthenticated:
+  login_sa(c, sa_name, build_dir)
+
+  policy_dict = json.loads(c.run(f'gcloud functions get-iam-policy {settings["WEBHOOK_NAME"]} --format json', hide=True).stdout.strip())
+  allUsers_is_invoker_member = False
+  for binding in policy_dict.get('bindings', []):
+    for member in binding.get('members', []):
+      if member == "allUsers" and binding['role'] == "roles/cloudfunctions.invoker":
+        allUsers_is_invoker_member = True
+  if allUsers_is_invoker_member:
     authenticated = '--allow-unauthenticated'
   else:
     authenticated = '--no-allow-unauthenticated'
+
+  if internal_only == True:
+    ingress_settings = 'internal-only'
+  elif internal_only == False:
+    ingress_settings = 'all'
+  else:
+    raise RuntimeError(f'Expected internal_only to be one of [True, False], received: {ingress_settings}')
   result = c.run(f'gcloud --quiet functions deploy --trigger-http --runtime {settings["WEBHOOK_RUNTIME"]} --project={settings["PROJECT_ID"]} {settings["WEBHOOK_NAME"]} {authenticated} --ingress-settings={ingress_settings} --source=gs://{settings["PROJECT_ID"]}/webhook.zip', hide=True)
+  if 'error' in result.stderr.lower():
+    return {'status': 500, 'response':result.stderr.strip()}
+  else:
+    return {'status': 200, 'response':result.stdout.strip()}
+
+
+@task
+def update_webhook_access(c,
+  allow_unauthenticated=True,
+  config_file=pathlib.Path(CONFIG_FILE_DEFAULT),
+  build_dir=pathlib.Path(BUILD_DIR_DEFAULT),
+  sa_name=None,
+):
+  settings = source(c, config_file, build_dir, stdout=False)
+  set_project(c, settings["PROJECT_ID"])
+  if not sa_name:
+    sa_name = settings["SETUP_SA_NAME"]
+  login_sa(c, sa_name, build_dir)
+
+  description = json.loads(c.run(f'gcloud functions describe {settings["WEBHOOK_NAME"]} --format json', hide=True).stdout.strip())
+  if description["ingressSettings"] == "ALLOW_ALL":
+    ingress_settings = "all"
+  else:
+    ingress_settings = "internal-only"
+
+  if allow_unauthenticated == True:
+    result = c.run(f'gcloud --quiet functions deploy --allow-unauthenticated --trigger-http --runtime {settings["WEBHOOK_RUNTIME"]} --project={settings["PROJECT_ID"]} {settings["WEBHOOK_NAME"]} --ingress-settings={ingress_settings} --source=gs://{settings["PROJECT_ID"]}/webhook.zip', hide=True)
+  elif allow_unauthenticated == False:
+    result = c.run(f'gcloud --quiet functions deploy --no-allow-unauthenticated --trigger-http --runtime {settings["WEBHOOK_RUNTIME"]} --project={settings["PROJECT_ID"]} {settings["WEBHOOK_NAME"]} --ingress-settings={ingress_settings} --source=gs://{settings["PROJECT_ID"]}/webhook.zip', hide=True)
+  else:
+    raise RuntimeError(f'Expected allow_unauthenticated to be one of [True, False], received: {allow_unauthenticated}')
   if 'error' in result.stderr.lower():
     return {'status': 500, 'response':result.stderr.strip()}
   else:
@@ -579,7 +648,7 @@ def deploy_agent(c,
   token = c.run('gcloud auth print-access-token', hide=True).stdout.strip()
   data = json.dumps({"displayName": "Telecommunications","defaultLanguageCode": "en","timeZone": "America/Chicago"})
   c.run(f'curl -s -X POST -H "Authorization: Bearer {token}" -H "Content-Type:application/json" -H "x-goog-user-project: {settings["PROJECT_ID"]}" -d \'{data}\' "https://{settings["REGION"]}-dialogflow.googleapis.com/v3/projects/{settings["PROJECT_ID"]}/locations/{settings["REGION"]}/agents"', warn=True)
-  agent_name = get_agents(c)['Telecommunications']['name']
+  agent_name = get_agents(c, config_file, build_dir)['Telecommunications']['name']
   data = json.dumps({"agentUri": AGENT_SOURCE_URI})
   c.run(f'curl -s -X POST -H "Authorization: Bearer {token}" -H "Content-Type:application/json" -H "x-goog-user-project: {settings["PROJECT_ID"]}" -d \'{data}\' "https://{settings["REGION"]}-dialogflow.googleapis.com/v3/{agent_name}:restore"')
 
@@ -596,9 +665,12 @@ def deploy_agent(c,
 def get_agents(c,
   config_file=pathlib.Path(CONFIG_FILE_DEFAULT),
   build_dir=pathlib.Path(BUILD_DIR_DEFAULT),
+  sa_name=None,
 ):
   settings = source(c, config_file, build_dir, stdout=False)
-  login_sa(c, settings["SETUP_SA_NAME"], build_dir)
+  if not sa_name:
+    sa_name = settings["SETUP_SA_NAME"]
+  login_sa(c, sa_name, build_dir)
 
   token = c.run('gcloud auth print-access-token', hide=True).stdout.strip()
   result = c.run(f'curl -s -X GET -H "Authorization: Bearer {token}" -H "x-goog-user-project: {settings["PROJECT_ID"]}" "https://{settings["REGION"]}-dialogflow.googleapis.com/v3/projects/{settings["PROJECT_ID"]}/locations/{settings["REGION"]}/agents"', warn=True, hide=True)
@@ -611,9 +683,12 @@ def get_webhooks(c,
   agent_name,
   config_file=pathlib.Path(CONFIG_FILE_DEFAULT),
   build_dir=pathlib.Path(BUILD_DIR_DEFAULT),
+  sa_name=None,
 ):
   settings = source(c, config_file, build_dir, stdout=False)
-  login_sa(c, settings["SETUP_SA_NAME"], build_dir)
+  if not sa_name:
+    sa_name = settings["SETUP_SA_NAME"]
+  login_sa(c, sa_name, build_dir)
   token = c.run('gcloud auth print-access-token', hide=True).stdout.strip()
   result = c.run(f'curl -s -X GET -H "Authorization: Bearer {token}" -H "x-goog-user-project: {settings["PROJECT_ID"]}" "https://{settings["REGION"]}-dialogflow.googleapis.com/v3/{agent_name}/webhooks"', warn=True, hide=True)
   agents = json.loads(result.stdout.strip())
@@ -625,9 +700,12 @@ def get_flows(c,
   agent_name,
   config_file=pathlib.Path(CONFIG_FILE_DEFAULT),
   build_dir=pathlib.Path(BUILD_DIR_DEFAULT),
+  sa_name=None,
 ):
   settings = source(c, config_file, build_dir, stdout=False)
-  login_sa(c, settings["SETUP_SA_NAME"], build_dir)
+  if not sa_name:
+    sa_name = settings["SETUP_SA_NAME"]
+  login_sa(c, sa_name, build_dir)
 
   token = c.run('gcloud auth print-access-token', hide=True).stdout.strip()
   result = c.run(f'curl -s -X GET -H "Authorization: Bearer {token}" -H "x-goog-user-project: {settings["PROJECT_ID"]}" "https://{settings["REGION"]}-dialogflow.googleapis.com/v3/{agent_name}/flows"', warn=True, hide=True)
@@ -640,9 +718,12 @@ def get_pages(c,
   flow_name,
   config_file=pathlib.Path(CONFIG_FILE_DEFAULT),
   build_dir=pathlib.Path(BUILD_DIR_DEFAULT),
+  sa_name=None,
 ):
   settings = source(c, config_file, build_dir, stdout=False)
-  login_sa(c, settings["SETUP_SA_NAME"], build_dir)
+  if not sa_name:
+    sa_name = settings["SETUP_SA_NAME"]
+  login_sa(c, sa_name, build_dir)
 
   token = c.run('gcloud auth print-access-token', hide=True).stdout.strip()
   result = c.run(f'curl -s -X GET -H "Authorization: Bearer {token}" -H "x-goog-user-project: {settings["PROJECT_ID"]}" "https://{settings["REGION"]}-dialogflow.googleapis.com/v3/{flow_name}/pages"', warn=True, hide=True)
@@ -654,13 +735,16 @@ def get_pages(c,
 def ping_agent(c,
   config_file=pathlib.Path(CONFIG_FILE_DEFAULT),
   build_dir=pathlib.Path(BUILD_DIR_DEFAULT),
+  sa_name=None,
 ):
   settings = source(c, config_file, build_dir, stdout=False)
-  login_sa(c, settings["SETUP_SA_NAME"], build_dir)
+  if not sa_name:
+    sa_name = settings["SETUP_SA_NAME"]
+  login_sa(c, sa_name, build_dir)
 
-  agent_name = get_agents(c)['Telecommunications']['name']
-  flow_name = get_flows(c, agent_name)['Cruise Plan']['name']
-  page_name = get_pages(c, flow_name)['Collect Customer Line']['name']
+  agent_name = get_agents(c, config_file, build_dir, sa_name=sa_name)['Telecommunications']['name']
+  flow_name = get_flows(c, agent_name, config_file, build_dir, sa_name=sa_name)['Cruise Plan']['name']
+  page_name = get_pages(c, flow_name, config_file, build_dir, sa_name=sa_name)['Collect Customer Line']['name']
   session_id = str(uuid.uuid1())
 
   token = c.run('gcloud auth print-access-token', hide=True).stdout.strip()
@@ -669,7 +753,8 @@ def ping_agent(c,
       "queryParams": {"currentPage": page_name}
     })
   result = c.run(f'curl -s -X POST -H "Authorization: Bearer {token}" -H "Content-Type:application/json" -H "x-goog-user-project: {settings["PROJECT_ID"]}" -d \'{data}\' "https://{settings["REGION"]}-dialogflow.googleapis.com/v3/{agent_name}/sessions/{session_id}:detectIntent"', warn=True, hide=True)
-  print(json.loads(result.stdout.strip())['queryResult']['responseMessages'][0]['text']['text'][0]) 
+  result_text =  json.loads(result.stdout.strip())['queryResult']['responseMessages'][0]['text']['text'][0]
+  return {'status': 200, 'response':result_text}
 
 
 @task
@@ -700,7 +785,7 @@ def update_agent_webhook(c,
   login_sa(c, sa_name, build_dir)
   token = c.run('gcloud auth print-access-token', hide=True).stdout.strip()
 
-  agent_name = get_agents(c)['Telecommunications']['name']
+  agent_name = get_agents(c, config_file, build_dir, sa_name=sa_name)['Telecommunications']['name']
   if fulfillment=='generic-web-service':
     webhook_name = get_webhooks(c, agent_name)['cxPrebuiltAgentsTelecom']['name']
     data = json.dumps({"displayName": "cxPrebuiltAgentsTelecom", "genericWebService": {"uri": settings["WEBHOOK_TRIGGER_URI"]}})
@@ -808,7 +893,7 @@ def deploy_demo(c,
   set_project(c, settings["PROJECT_ID"])
   login_sa(c, settings["SETUP_SA_NAME"], build_dir)
 
-  for filename in ['Dockerfile', 'Procfile', 'requirements.txt']:
+  for filename in ['Dockerfile', 'Procfile', 'requirements.txt', 'ping_agent.py']:
     c.run(f'cp {template_dir/"demo_backend"/filename} {build_dir/"demo_backend"/filename}')
   for filename in ['app.py']:
     src = template_dir/'demo_backend'/f'{filename}.j2'
@@ -819,6 +904,9 @@ def deploy_demo(c,
   c.run(f'cp {build_dir/config_file} {build_dir/"demo_backend/config.json"}')
   c.run(f'cp {build_dir/"keys"/settings["DEMO_BACKEND_SA_NAME"]} {build_dir/"demo_backend"/settings["DEMO_BACKEND_SA_NAME"]}')
 
+  src = template_dir/"demo_backend"/"ping_examples.sh.j2"
+  tgt = build_dir/"demo_backend"/"ping_examples.sh"
+  apply_template(src, tgt, settings, backend_debug=not prod)
   if prod:
     c.run(f'gcloud builds submit {build_dir/"demo_backend"} --tag={settings["DEMO_BACKEND_SERVER_IMAGE_URI"]} --gcs-log-dir=gs://{settings["PROJECT_ID"]}/{settings["DEMO_BACKEND_SERVER_IMAGE"]}-build-logs')
     c.run(f'gcloud run deploy --allow-unauthenticated {settings["DEMO_BACKEND_SERVER"]} \
@@ -831,6 +919,3 @@ def deploy_demo(c,
       --vpc-egress=all-traffic')
   else:
     c.run(f'cd {build_dir/"demo_backend"} && sudo docker run -p 127.0.0.1:5000:5000 --rm -it $(sudo docker build -q .)', pty=True)
-  src = template_dir/"demo_backend"/"ping_examples.sh.j2"
-  tgt = build_dir/"demo_backend"/"ping_examples.sh"
-  apply_template(src, tgt, settings, backend_debug=not prod)

@@ -10,6 +10,7 @@ COPY ./requirements.txt /app/requirements.txt
 WORKDIR /app
 
 # install the dependencies and packages in the requirements file
+RUN pip install --upgrade pip
 RUN pip install -r requirements.txt
 
 EXPOSE 5000

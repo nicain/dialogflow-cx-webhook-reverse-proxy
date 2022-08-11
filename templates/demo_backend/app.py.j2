@@ -86,6 +86,11 @@ def configuration():
   return configuration_dict
 
 
+@app.route('/ping_agent', methods=['GET'])
+def ping_agent_endpoint():
+  return tasks.ping_agent(invoke.Context(), sa_name=SA_NAME, config_file=CONFIG_FILE, build_dir=BUILD_DIR)
+
+
 @app.route('/ping_webhook', methods=['GET'])
 def ping_webhook():
   app.logger.info('ping_webhook:')
@@ -102,22 +107,35 @@ def ping_webhook():
   return Response(**result_dict)
 
 
-@app.route('/update_webhook', methods=['POST'])
-def update_webhook():
-  app.logger.info('update_webhook:')
+@app.route('/update_webhook_access', methods=['POST'])
+def update_webhook_access():
+  app.logger.info('update_webhook_access:')
   content = request.get_json(silent=True)
 
-  allow_unauthenticated = content.get('allow_unauthenticated', True)
+  allow_unauthenticated = content['allow_unauthenticated']
   app.logger.info(f'  allow_unauthenticated: {allow_unauthenticated}')
-  ingress_settings = content.get('ingress_settings', 'all')
-  app.logger.info(f'  ingress_settings: {ingress_settings}')
 
-  result_dict = tasks.update_webhook(invoke.Context(), 
+  result_dict = tasks.update_webhook_access(invoke.Context(), 
     sa_name=SA_NAME,
     allow_unauthenticated=allow_unauthenticated,
-    ingress_settings=ingress_settings,
     config_file=CONFIG_FILE, build_dir=BUILD_DIR)
-  app.logger.info(f'  update_webhook: {result_dict["status"]}')
+  app.logger.info(f'  update_webhook_access: {result_dict["status"]}')
+  return Response(**result_dict)
+
+
+@app.route('/update_webhook_ingress', methods=['POST'])
+def update_webhook_ingress():
+  app.logger.info('update_webhook_ingress:')
+  content = request.get_json(silent=True)
+
+  internal_only = content['internal_only']
+  app.logger.info(f'  internal_only: {internal_only}')
+
+  result_dict = tasks.update_webhook_ingress(invoke.Context(),
+    sa_name=SA_NAME,
+    internal_only=internal_only,
+    config_file=CONFIG_FILE, build_dir=BUILD_DIR)
+  app.logger.info(f'  update_webhook_ingress: {result_dict["status"]}')
   return Response(**result_dict)
 
 
