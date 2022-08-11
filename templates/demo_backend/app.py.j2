@@ -28,48 +28,56 @@ authorized_emails = [
 
 @app.before_request
 def check_user_authentication():
-    app.logger.info('[0] Begin check_user_authentication')
 
-    verified_email = None
+  if request.endpoint is None:
+    abort(405, {'message': 'Requested endpoint/method not recognized'})
 
-    auth = request.headers.get("Authorization", None)
+  app.logger.info('[0] Begin check_user_authentication')
 
-    if auth is None:
-        return abort(403)
+  if request.endpoint == 'ping_webhook' and request.args['authenticated'] == 'false':
+    app.logger.info(f'[0]   Skipping Authorization Check:')
+    return
 
-    if not auth.startswith("Bearer "):
-        return abort(403)
+  verified_email = None
 
-    token = auth[7:]  # Remove "Bearer: " prefix
+  auth = request.headers.get("Authorization", None)
 
-    # Extract the email address from the token. Since there may be
-    # two types of token provided (Firebase or Google OAuth2) and
-    # failed verification raises an exception, need multiple
-    # try/except blocks.
+  if auth is None:
+    return abort(403)
 
-    info = None
-    try:
-        info = id_token.verify_firebase_token(token, reqs.Request())
-    except ValueError:
-        pass
+  if not auth.startswith("Bearer "):
+    return abort(403)
 
-    try:
-        if info is None:
-            info = id_token.verify_oauth2_token(token, reqs.Request())
-    except ValueError:
-        pass
+  token = auth[7:]  # Remove "Bearer: " prefix
 
+  # Extract the email address from the token. Since there may be
+  # two types of token provided (Firebase or Google OAuth2) and
+  # failed verification raises an exception, need multiple
+  # try/except blocks.
+
+  info = None
+  try:
+    info = id_token.verify_firebase_token(token, reqs.Request())
+  except ValueError:
+    pass
+
+  try:
     if info is None:
-        return abort(403)
+      info = id_token.verify_oauth2_token(token, reqs.Request())
+  except ValueError:
+    pass
 
-    if "email" not in info:
-        return abort(403)
+  if info is None:
+    return abort(403)
 
-    verified_email = info["email"]
-    app.logger.info(f'[0]   User: {verified_email}')
-    if verified_email not in authorized_emails:
-        return abort(403)
-    app.logger.info(f'[0]   Authorized: {verified_email}')
+  if "email" not in info:
+    return abort(403)
+
+  verified_email = info["email"]
+  app.logger.info(f'[0]   User: {verified_email}')
+  if verified_email not in authorized_emails:
+    return abort(403)
+  app.logger.info(f'[0]   Authorized: {verified_email}')
 
 
 @app.route('/')

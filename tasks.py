@@ -893,7 +893,7 @@ def deploy_demo(c,
   set_project(c, settings["PROJECT_ID"])
   login_sa(c, settings["SETUP_SA_NAME"], build_dir)
 
-  for filename in ['Dockerfile', 'Procfile', 'requirements.txt', 'ping_agent.py']:
+  for filename in ['Dockerfile', 'Procfile', 'requirements.txt']:
     c.run(f'cp {template_dir/"demo_backend"/filename} {build_dir/"demo_backend"/filename}')
   for filename in ['app.py']:
     src = template_dir/'demo_backend'/f'{filename}.j2'
