@@ -973,11 +973,8 @@ def get_status(c,
     status_dict['cloudfunctions_restricted'] = False
     status_dict['dialogflow_restricted'] = False
   else:
-<<<<<<< HEAD
-    status_dict['cloudfunctions_restricted'] = 'cloudfunction.googleapis.com' in result_dict['status']['restrictedServices']
-=======
     status_dict['cloudfunctions_restricted'] = 'cloudfunctions.googleapis.com' in result_dict['status']['restrictedServices']
->>>>>>> e15ea93 (adding get_status GET endpoint)
+    status_dict['cloudfunctions_restricted'] = 'cloudfunctions.googleapis.com' in result_dict['status']['restrictedServices']
     status_dict['dialogflow_restricted'] = 'dialogflow.googleapis.com' in result_dict['status']['restrictedServices']
 
   # Webhook Fulfillment:

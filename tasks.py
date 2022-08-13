@@ -954,14 +954,6 @@ def get_status(c,
   webhook_fulfillment=True,
   webhook_ingress=True,
   webhook_access=True,
-<<<<<<< HEAD
-):
-  settings = source(c, config_file, build_dir, stdout=False)
-  set_project(c, settings["PROJECT_ID"])
-  if not sa_name:
-    sa_name = settings["SETUP_SA_NAME"]
-  login_sa(c, sa_name, build_dir)
-=======
   skip_setup=False,
 ):
   settings = source(c, config_file, build_dir, stdout=False)
@@ -970,7 +962,6 @@ def get_status(c,
     if not sa_name:
       sa_name = settings["SETUP_SA_NAME"]
     login_sa(c, sa_name, build_dir)
->>>>>>> e15ea93 (adding get_status GET endpoint)
 
   status_dict = {}
 
@@ -985,11 +976,7 @@ def get_status(c,
       status_dict['cloudfunctions_restricted'] = False
       status_dict['dialogflow_restricted'] = False
     else:
-<<<<<<< HEAD
-      status_dict['cloudfunctions_restricted'] = 'cloudfunction.googleapis.com' in result_dict['status']['restrictedServices']
-=======
       status_dict['cloudfunctions_restricted'] = 'cloudfunctions.googleapis.com' in result_dict['status']['restrictedServices']
->>>>>>> e15ea93 (adding get_status GET endpoint)
       status_dict['dialogflow_restricted'] = 'dialogflow.googleapis.com' in result_dict['status']['restrictedServices']
 
   # Webhook Fulfillment:

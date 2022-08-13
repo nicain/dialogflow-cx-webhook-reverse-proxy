@@ -2,32 +2,11 @@
 <html>
   <head>
     <title>Turbo-Flask Streams Demo</title>
-<<<<<<< HEAD
-    <style>
-      .load {
-        float: left;
-        width: 1000px;
-        border: 1px solid black;
-        margin-left: 10px;
-        margin-bottom: 10px;
-        padding: 10px;
-      }
-      .load th, .load td {
-        padding: 6px;
-        text-align: center;
-      }
-    </style>
-    {{ turbo() }}
-  </head>
-  <body>
-    {% include "loadavg.html" %}
-=======
     {{ turbo() }}
   </head>
   <body>
     cloudfunctions_restricted: {% include "cloudfunctions_restricted.html" %}
     dialogflow_restricted: {% include "dialogflow_restricted.html" %}
->>>>>>> e15ea93 (adding get_status GET endpoint)
     {% block content %}{% endblock %}
   </body>
 </html>
