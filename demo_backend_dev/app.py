@@ -1,33 +1,73 @@
-from flask import Flask, request, Response, abort
+from flask import Flask, request, Response, abort, render_template
+from turbo_flask import Turbo
 import os
 import tasks
 import invoke
 import pathlib
 import logging
+import threading
+import time
+import json
+
 
 from google.oauth2 import id_token
 from google.auth.transport import requests as reqs
 
 app = Flask(__name__)
+turbo = Turbo(app)
 gunicorn_logger = logging.getLogger('gunicorn.error')
 app.logger.handlers = gunicorn_logger.handlers
 app.logger.setLevel(gunicorn_logger.level)
 
 
-CONFIG_FILE="{{CONFIG_FILE}}"
-SA_NAME="{{DEMO_BACKEND_SA_NAME}}"
-BUILD_DIR=pathlib.Path('.')
+CONFIG_FILE="config.json"
+SA_NAME="demo-backend"
 # BUILD_DIR=pathlib.Path('/app')
+BUILD_DIR=pathlib.Path('./')
 
 
 tasks.login_sa(invoke.Context(), 'demo-backend', build_dir=BUILD_DIR)
 
 authorized_emails = [
-    '{{PRINCIPAL}}',
-    '{{DEMO_BACKEND_SA_NAME}}@{{PROJECT_ID}}.iam.gserviceaccount.com',
+    'nicholascain@cloudadvocacyorg.joonix.net',
+    'demo-backend@vpc-sc-demo-nicholascain14.iam.gserviceaccount.com',
 ]
 
-@app.before_request
+
+def update_load():
+  with app.app_context():
+    while True:
+      time.sleep(1)
+      turbo.push(turbo.replace(render_template('loadavg.html'), 'load_tmp'))
+
+import random
+
+@app.context_processor
+def inject_load():
+    # result = tasks.get_status(
+    #   invoke.Context(),
+    #   config_file=CONFIG_FILE, build_dir=BUILD_DIR,
+    #   sa_name=SA_NAME,
+    # )
+    return {'dialogflow_restricted':random.random()}
+    # result_dict = json.loads(result['response'])
+    # return {
+    #   'dialogflow_restricted': result_dict['dialogflow_restricted'], 
+    #   'cloudfunctions_restricted': result_dict['cloudfunctions_restricted'], 
+    #   'service_directory_webhook_fulfillment': result_dict['service_directory_webhook_fulfillment'], 
+    #   'webhook_ingress_internal_only': result_dict['webhook_ingress_internal_only'], 
+    #   'webhook_access_allow_unauthenticated': result_dict['webhook_access_allow_unauthenticated'], 
+    # }
+
+    
+
+
+@app.before_first_request
+def before_first_request():
+    threading.Thread(target=update_load).start()
+
+
+# @app.before_request
 def check_user_authentication():
 
   if request.endpoint is None:
@@ -82,8 +122,8 @@ def check_user_authentication():
 
 
 @app.route('/')
-def home():
-  return Response(status='200', response='OK')
+def index():
+  return render_template('index.html')
 
 
 @app.route('/configuration', methods=['GET'])
@@ -112,6 +152,7 @@ def ping_webhook():
     authenticated = False
   else:
     return Response(status=400, response=f'Value for "authenticated" must be one of [true, false], received: "{request.args["authenticated"]}"')
+
   app.logger.info(f'  authenticated: {authenticated}')
   result_dict = tasks.ping_webhook(invoke.Context(), sa_name=SA_NAME, authenticated=authenticated, config_file=CONFIG_FILE, build_dir=BUILD_DIR)
   app.logger.info(f'  ping_webhook: {result_dict["status"]}')
@@ -188,22 +229,10 @@ def update_agent_webhook():
 @app.route('/get_status', methods=['GET'])
 def get_status():
   app.logger.info('get_status:')
-
-
-  kwargs ={}
-  for key in ['restricted_services','webhook_fulfillment','webhook_ingress','webhook_access']:
-    if request.args.get(key, 'false') == 'true':
-      kwargs[key] = True
-    elif request.args.get(key, 'false') == 'false':
-      kwargs[key] = False
-    else:
-      return Response(status=400, response=f'Value for "{key}" must be one of [true, false], received: "{request.args[key]}"')
-
   result_dict = tasks.get_status(
     invoke.Context(),
     config_file=CONFIG_FILE, build_dir=BUILD_DIR,
     sa_name=SA_NAME,
-    **kwargs,
   )
   app.logger.info(f'  get_status: {result_dict["status"]}')
   return Response(**result_dict)

@@ -931,6 +931,10 @@ def deploy_demo(c,
   c.run(f'cp tasks.py {build_dir/"demo_backend/tasks.py"}')
   c.run(f'cp {build_dir/config_file} {build_dir/"demo_backend/config.json"}')
   c.run(f'cp {build_dir/"keys"/settings["DEMO_BACKEND_SA_NAME"]} {build_dir/"demo_backend"/settings["DEMO_BACKEND_SA_NAME"]}')
+
+  src = template_dir/"demo_backend"/"ping_examples.sh.j2"
+  tgt = build_dir/"demo_backend"/"ping_examples.sh"
+  apply_template(src, tgt, settings, backend_debug=not prod)
   if prod:
     c.run(f'gcloud builds submit {build_dir/"demo_backend"} --tag={settings["DEMO_BACKEND_SERVER_IMAGE_URI"]} --gcs-log-dir=gs://{settings["PROJECT_ID"]}/{settings["DEMO_BACKEND_SERVER_IMAGE"]}-build-logs')
     c.run(f'gcloud run deploy --allow-unauthenticated {settings["DEMO_BACKEND_SERVER"]} \
@@ -944,16 +948,11 @@ def deploy_demo(c,
   else:
     c.run(f'cd {build_dir/"demo_backend"} && sudo docker run -p 127.0.0.1:5000:5000 --rm -it $(sudo docker build -q .)', pty=True)
 
-
 @task
 def get_status(c,
   build_dir=pathlib.Path(BUILD_DIR_DEFAULT),
   config_file=pathlib.Path(CONFIG_FILE_DEFAULT),
   sa_name=None,
-  restricted_services=True,
-  webhook_fulfillment=True,
-  webhook_ingress=True,
-  webhook_access=True,
 ):
   settings = source(c, config_file, build_dir, stdout=False)
   set_project(c, settings["PROJECT_ID"])
@@ -961,57 +960,54 @@ def get_status(c,
     sa_name = settings["SETUP_SA_NAME"]
   login_sa(c, sa_name, build_dir)
 
+  # Get Access policy info:
+  access_policy_id = settings["ACCESS_POLICY_NAME"].split('/')[1]
   status_dict = {}
 
   # Restricted Services:
-  if restricted_services:
-    access_policy_id = settings["ACCESS_POLICY_NAME"].split('/')[1]
-    result = c.run(f'gcloud access-context-manager perimeters describe {settings["SECURITY_PERIMETER"]} --policy={access_policy_id} --format json', warn=True, hide=True)
-    if 'error' in result.stderr.lower():
-      return {'status': 500, 'response':result.stderr.strip()}
-    result_dict = json.loads(result.stdout.strip())
-    if 'restrictedServices' not in result_dict['status']:
-      status_dict['cloudfunctions_restricted'] = False
-      status_dict['dialogflow_restricted'] = False
-    else:
-      status_dict['cloudfunctions_restricted'] = 'cloudfunction.googleapis.com' in result_dict['status']['restrictedServices']
-      status_dict['dialogflow_restricted'] = 'dialogflow.googleapis.com' in result_dict['status']['restrictedServices']
+  result = c.run(f'gcloud access-context-manager perimeters describe {settings["SECURITY_PERIMETER"]} --policy={access_policy_id} --format json', warn=True, hide=True)
+  if 'error' in result.stderr.lower():
+    return {'status': 500, 'response':result.stderr.strip()}
+  result_dict = json.loads(result.stdout.strip())
+  if 'restrictedServices' not in result_dict['status']:
+    status_dict['cloudfunctions_restricted'] = False
+    status_dict['dialogflow_restricted'] = False
+  else:
+    status_dict['cloudfunctions_restricted'] = 'cloudfunction.googleapis.com' in result_dict['status']['restrictedServices']
+    status_dict['dialogflow_restricted'] = 'dialogflow.googleapis.com' in result_dict['status']['restrictedServices']
 
   # Webhook Fulfillment:
-  if webhook_fulfillment:
-    agent_name = get_agents(c, config_file, build_dir, sa_name=sa_name)['Telecommunications']['name']
-    webhook_dict = get_webhooks(c, agent_name, config_file, build_dir, sa_name=sa_name)['cxPrebuiltAgentsTelecom']
-    if 'serviceDirectory' in webhook_dict:
-      status_dict['service_directory_webhook_fulfillment'] = True
-    else:
-      status_dict['service_directory_webhook_fulfillment'] = False
+  agent_name = get_agents(c, config_file, build_dir, sa_name=sa_name)['Telecommunications']['name']
+  webhook_dict = get_webhooks(c, agent_name, config_file, build_dir, sa_name=sa_name)['cxPrebuiltAgentsTelecom']
+  if 'serviceDirectory' in webhook_dict:
+    status_dict['service_directory_webhook_fulfillment'] = True
+  else:
+    status_dict['service_directory_webhook_fulfillment'] = False
 
   # Webhook Ingress:
-  if webhook_ingress:
-    result = c.run(f'gcloud functions describe {settings["WEBHOOK_NAME"]} --format json', warn=True, hide=True)
-    if 'error' in result.stderr.lower():
-      return {'status': 500, 'response':result.stderr.strip()}
-    result_dict = json.loads(result.stdout.strip())
-    if result_dict['ingressSettings'] == 'ALLOW_INTERNAL_ONLY':
-      status_dict['webhook_ingress_internal_only'] = True
-    else:
-      status_dict['webhook_ingress_internal_only'] = False
+  result = c.run(f'gcloud functions describe {settings["WEBHOOK_NAME"]} --format json', warn=True, hide=True)
+  if 'error' in result.stderr.lower():
+    return {'status': 500, 'response':result.stderr.strip()}
+  result_dict = json.loads(result.stdout.strip())
+  if result_dict['ingressSettings'] == 'ALLOW_INTERNAL_ONLY':
+    status_dict['webhook_ingress_internal_only'] = True
+  else:
+    status_dict['webhook_ingress_internal_only'] = False
 
-  # Webhook Access:
-  if webhook_access:
-    result = c.run(f'gcloud functions get-iam-policy {settings["WEBHOOK_NAME"]} --format json', hide=True, warn=True)
-    if 'error' in result.stderr.lower():
-      return {'status': 500, 'response':result.stderr.strip()}
-    policy_dict = json.loads(result.stdout.strip())
-    allUsers_is_invoker_member = False
-    for binding in policy_dict.get('bindings', []):
-      for member in binding.get('members', []):
-        if member == "allUsers" and binding['role'] == "roles/cloudfunctions.invoker":
-          allUsers_is_invoker_member = True
-    if allUsers_is_invoker_member:
-      status_dict['webhook_access_allow_unauthenticated'] = True
-    else:
-      status_dict['webhook_access_allow_unauthenticated'] = False
-
+  # Webhook Access
+  result = c.run(f'gcloud functions get-iam-policy {settings["WEBHOOK_NAME"]} --format json', hide=True, warn=True)
+  if 'error' in result.stderr.lower():
+    return {'status': 500, 'response':result.stderr.strip()}
+  policy_dict = json.loads(result.stdout.strip())
+  allUsers_is_invoker_member = False
+  for binding in policy_dict.get('bindings', []):
+    for member in binding.get('members', []):
+      if member == "allUsers" and binding['role'] == "roles/cloudfunctions.invoker":
+        allUsers_is_invoker_member = True
+  if allUsers_is_invoker_member:
+    status_dict['webhook_access_allow_unauthenticated'] = True
+  else:
+    status_dict['webhook_access_allow_unauthenticated'] = False
+  print(status_dict)
   return {'status':200, 'response':json.dumps(status_dict)}
   
