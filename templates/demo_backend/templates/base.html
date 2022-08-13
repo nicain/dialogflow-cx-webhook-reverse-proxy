@@ -2,6 +2,7 @@
 <html>
   <head>
     <title>Turbo-Flask Streams Demo</title>
+<<<<<<< HEAD
     <style>
       .load {
         float: left;
@@ -20,6 +21,13 @@
   </head>
   <body>
     {% include "loadavg.html" %}
+=======
+    {{ turbo() }}
+  </head>
+  <body>
+    cloudfunctions_restricted: {% include "cloudfunctions_restricted.html" %}
+    dialogflow_restricted: {% include "dialogflow_restricted.html" %}
+>>>>>>> e15ea93 (adding get_status GET endpoint)
     {% block content %}{% endblock %}
   </body>
 </html>

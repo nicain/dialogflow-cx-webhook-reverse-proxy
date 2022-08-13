@@ -1,33 +1,86 @@
-from flask import Flask, request, Response, abort
+from flask import Flask, request, Response, abort, render_template
+from turbo_flask import Turbo
 import os
 import tasks
 import invoke
 import pathlib
 import logging
+import time
+import json
+import threading
 
 from google.oauth2 import id_token
 from google.auth.transport import requests as reqs
 
 app = Flask(__name__)
+turbo = Turbo(app)
 gunicorn_logger = logging.getLogger('gunicorn.error')
 app.logger.handlers = gunicorn_logger.handlers
 app.logger.setLevel(gunicorn_logger.level)
 
+CONFIG_FILE=os.environ['CONFIG_FILE']
+SA_NAME=os.environ['DEMO_BACKEND_SA_NAME']
+PRINCIPAL=os.environ['PRINCIPAL']
+PROJECT_ID=os.environ['PROJECT_ID']
 
-CONFIG_FILE="{{CONFIG_FILE}}"
-SA_NAME="{{DEMO_BACKEND_SA_NAME}}"
 BUILD_DIR=pathlib.Path('.')
-# BUILD_DIR=pathlib.Path('/app')
-
-
 tasks.login_sa(invoke.Context(), 'demo-backend', build_dir=BUILD_DIR)
 
 authorized_emails = [
-    '{{PRINCIPAL}}',
-    '{{DEMO_BACKEND_SA_NAME}}@{{PROJECT_ID}}.iam.gserviceaccount.com',
+    PRINCIPAL,
+    f'{SA_NAME}@{PROJECT_ID}.iam.gserviceaccount.com',
 ]
 
-@app.before_request
+def update_project_status():
+  with app.app_context():
+    while True:
+      time.sleep(.5)
+      turbo.push(turbo.replace(render_template('cloudfunctions_restricted.html'), 'cloudfunctions_restricted_anchor'))
+      turbo.push(turbo.replace(render_template('dialogflow_restricted.html'), 'dialogflow_restricted_anchor'))
+      print('PUSH')
+# ['restricted_services','webhook_fulfillment','webhook_ingress','webhook_access']
+
+
+class ProjectStatus:
+  def __init__(self):
+    self.cloudfunctions_restricted = None
+    self.dialogflow_restricted = None
+
+status = ProjectStatus()
+
+def poll_restricted_services():
+  while True:
+    result = tasks.get_status(
+      invoke.Context(),
+      config_file=CONFIG_FILE, build_dir=BUILD_DIR,
+      sa_name=SA_NAME,
+      restricted_services=True,
+      webhook_fulfillment=False,
+      webhook_ingress=False,
+      webhook_access=False,
+      skip_setup=True,
+    )
+    result_dict = json.loads(result['response'])
+    status.cloudfunctions_restricted = result_dict['cloudfunctions_restricted']
+    status.dialogflow_restricted = result_dict['dialogflow_restricted']
+    print('POLL')
+
+
+@app.before_first_request
+def other_before_first_request():
+    threading.Thread(target=update_project_status).start()
+    threading.Thread(target=poll_restricted_services).start()
+
+
+@app.context_processor
+def inject_status_into_context():
+    return {
+      'cloudfunctions_restricted': status.cloudfunctions_restricted,
+      'dialogflow_restricted':  status.dialogflow_restricted,
+    }
+
+
+# @app.before_request
 def check_user_authentication():
 
   if request.endpoint is None:
@@ -83,7 +136,7 @@ def check_user_authentication():
 
 @app.route('/')
 def home():
-  return Response(status='200', response='OK')
+  return render_template('index.html')
 
 
 @app.route('/configuration', methods=['GET'])
