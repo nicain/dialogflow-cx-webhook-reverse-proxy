@@ -4,9 +4,18 @@
     <title>Turbo-Flask Streams Demo</title>
     {{ turbo() }}
   </head>
+  <style>
+    .polling_status:after {
+      content: '\A';
+      white-space: pre;
+    }
+  </style>
   <body>
     cloudfunctions_restricted: {% include "cloudfunctions_restricted.html" %}
     dialogflow_restricted: {% include "dialogflow_restricted.html" %}
+    service_directory_webhook_fulfillment: {% include "service_directory_webhook_fulfillment.html" %}
+    webhook_ingress_internal_only: {% include "webhook_ingress_internal_only.html" %}
+    webhook_access_allow_unauthenticated: {% include "webhook_access_allow_unauthenticated.html" %}
     {% block content %}{% endblock %}
   </body>
 </html>

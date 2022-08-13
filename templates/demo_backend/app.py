@@ -34,17 +34,22 @@ authorized_emails = [
 def update_project_status():
   with app.app_context():
     while True:
-      time.sleep(.5)
+      time.sleep(1)
       turbo.push(turbo.replace(render_template('cloudfunctions_restricted.html'), 'cloudfunctions_restricted_anchor'))
       turbo.push(turbo.replace(render_template('dialogflow_restricted.html'), 'dialogflow_restricted_anchor'))
-      print('PUSH')
-# ['restricted_services','webhook_fulfillment','webhook_ingress','webhook_access']
+      turbo.push(turbo.replace(render_template('service_directory_webhook_fulfillment.html'), 'service_directory_webhook_fulfillment_anchor'))
+      turbo.push(turbo.replace(render_template('webhook_ingress_internal_only.html'), 'webhook_ingress_internal_only_anchor'))
+      turbo.push(turbo.replace(render_template('webhook_access_allow_unauthenticated.html'), 'webhook_access_allow_unauthenticated_anchor'))
 
 
 class ProjectStatus:
   def __init__(self):
     self.cloudfunctions_restricted = None
     self.dialogflow_restricted = None
+    self.service_directory_webhook_fulfillment = None
+    self.webhook_ingress_internal_only = None
+    self.webhook_access_allow_unauthenticated = None
+
 
 status = ProjectStatus()
 
@@ -60,16 +65,82 @@ def poll_restricted_services():
       webhook_access=False,
       skip_setup=True,
     )
-    result_dict = json.loads(result['response'])
-    status.cloudfunctions_restricted = result_dict['cloudfunctions_restricted']
-    status.dialogflow_restricted = result_dict['dialogflow_restricted']
-    print('POLL')
+    if result['status'] == 200:
+      result_dict = json.loads(result['response'])
+      status.cloudfunctions_restricted = result_dict['cloudfunctions_restricted']
+      status.dialogflow_restricted = result_dict['dialogflow_restricted']
+    else:
+      status.cloudfunctions_restricted = 'ERROR'
+      status.dialogflow_restricted = 'ERROR'
+
+
+
+def poll_service_directory_webhook_fulfillment():
+  while True:
+    result = tasks.get_status(
+      invoke.Context(),
+      config_file=CONFIG_FILE, build_dir=BUILD_DIR,
+      sa_name=SA_NAME,
+      restricted_services=False,
+      webhook_fulfillment=True,
+      webhook_ingress=False,
+      webhook_access=False,
+      skip_setup=True,
+    )
+    if result['status'] == 200:
+      result_dict = json.loads(result['response'])
+      status.service_directory_webhook_fulfillment = result_dict['service_directory_webhook_fulfillment']
+    else:
+      status.service_directory_webhook_fulfillment = 'ERROR'
+
+
+def poll_webhook_ingress_internal_only():
+  while True:
+    result = tasks.get_status(
+      invoke.Context(),
+      config_file=CONFIG_FILE, build_dir=BUILD_DIR,
+      sa_name=SA_NAME,
+      restricted_services=False,
+      webhook_fulfillment=False,
+      webhook_ingress=True,
+      webhook_access=False,
+      skip_setup=True,
+    )
+    if result['status'] == 200:
+      result_dict = json.loads(result['response'])
+      status.webhook_ingress_internal_only = result_dict['webhook_ingress_internal_only']
+    else:
+      status.webhook_ingress_internal_only = 'ERROR'
+
+
+def poll_webhook_access_allow_unauthenticated():
+  while True:
+    result = tasks.get_status(
+      invoke.Context(),
+      config_file=CONFIG_FILE, build_dir=BUILD_DIR,
+      sa_name=SA_NAME,
+      restricted_services=False,
+      webhook_fulfillment=False,
+      webhook_ingress=False,
+      webhook_access=True,
+      skip_setup=True,
+    )
+    if result['status'] == 200:
+      result_dict = json.loads(result['response'])
+      status.webhook_access_allow_unauthenticated = result_dict['webhook_access_allow_unauthenticated']
+    else:
+      status.webhook_access_allow_unauthenticated = 'ERROR'
+
+
 
 
 @app.before_first_request
 def other_before_first_request():
     threading.Thread(target=update_project_status).start()
     threading.Thread(target=poll_restricted_services).start()
+    threading.Thread(target=poll_service_directory_webhook_fulfillment).start()
+    threading.Thread(target=poll_webhook_ingress_internal_only).start()
+    threading.Thread(target=poll_webhook_access_allow_unauthenticated).start()
 
 
 @app.context_processor
@@ -77,6 +148,9 @@ def inject_status_into_context():
     return {
       'cloudfunctions_restricted': status.cloudfunctions_restricted,
       'dialogflow_restricted':  status.dialogflow_restricted,
+      'service_directory_webhook_fulfillment': status.service_directory_webhook_fulfillment,
+      'webhook_ingress_internal_only':  status.webhook_ingress_internal_only,
+      'webhook_access_allow_unauthenticated':  status.webhook_access_allow_unauthenticated,
     }
 
 
