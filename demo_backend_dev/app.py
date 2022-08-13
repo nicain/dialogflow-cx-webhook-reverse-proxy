@@ -1,32 +1,73 @@
-from flask import Flask, request, Response, abort
+from flask import Flask, request, Response, abort, render_template
+from turbo_flask import Turbo
 import os
 import tasks
 import invoke
 import pathlib
 import logging
+import threading
+import time
+import json
+
 
 from google.oauth2 import id_token
 from google.auth.transport import requests as reqs
 
 app = Flask(__name__)
+turbo = Turbo(app)
 gunicorn_logger = logging.getLogger('gunicorn.error')
 app.logger.handlers = gunicorn_logger.handlers
 app.logger.setLevel(gunicorn_logger.level)
 
 
-CONFIG_FILE="{{CONFIG_FILE}}"
-SA_NAME="{{DEMO_BACKEND_SA_NAME}}"
-BUILD_DIR=pathlib.Path('/app')
+CONFIG_FILE="config.json"
+SA_NAME="demo-backend"
+# BUILD_DIR=pathlib.Path('/app')
+BUILD_DIR=pathlib.Path('./')
 
 
 tasks.login_sa(invoke.Context(), 'demo-backend', build_dir=BUILD_DIR)
 
 authorized_emails = [
-    '{{PRINCIPAL}}',
-    '{{DEMO_BACKEND_SA_NAME}}@{{PROJECT_ID}}.iam.gserviceaccount.com',
+    'nicholascain@cloudadvocacyorg.joonix.net',
+    'demo-backend@vpc-sc-demo-nicholascain14.iam.gserviceaccount.com',
 ]
 
-@app.before_request
+
+def update_load():
+  with app.app_context():
+    while True:
+      time.sleep(1)
+      turbo.push(turbo.replace(render_template('loadavg.html'), 'load_tmp'))
+
+import random
+
+@app.context_processor
+def inject_load():
+    # result = tasks.get_status(
+    #   invoke.Context(),
+    #   config_file=CONFIG_FILE, build_dir=BUILD_DIR,
+    #   sa_name=SA_NAME,
+    # )
+    return {'dialogflow_restricted':random.random()}
+    # result_dict = json.loads(result['response'])
+    # return {
+    #   'dialogflow_restricted': result_dict['dialogflow_restricted'], 
+    #   'cloudfunctions_restricted': result_dict['cloudfunctions_restricted'], 
+    #   'service_directory_webhook_fulfillment': result_dict['service_directory_webhook_fulfillment'], 
+    #   'webhook_ingress_internal_only': result_dict['webhook_ingress_internal_only'], 
+    #   'webhook_access_allow_unauthenticated': result_dict['webhook_access_allow_unauthenticated'], 
+    # }
+
+    
+
+
+@app.before_first_request
+def before_first_request():
+    threading.Thread(target=update_load).start()
+
+
+# @app.before_request
 def check_user_authentication():
 
   if request.endpoint is None:
@@ -81,8 +122,8 @@ def check_user_authentication():
 
 
 @app.route('/')
-def home():
-  return Response(status='200', response='OK')
+def index():
+  return render_template('index.html')
 
 
 @app.route('/configuration', methods=['GET'])
@@ -95,8 +136,11 @@ def configuration():
 
 
 @app.route('/ping_agent', methods=['GET'])
-def ping_agent_endpoint():
-  return tasks.ping_agent(invoke.Context(), sa_name=SA_NAME, config_file=CONFIG_FILE, build_dir=BUILD_DIR)
+def ping_agent():
+  app.logger.info('ping_agent:')
+  result_dict = tasks.ping_agent(invoke.Context(), sa_name=SA_NAME, config_file=CONFIG_FILE, build_dir=BUILD_DIR)
+  app.logger.info(f'  ping_agent: {result_dict["status"]}')
+  return Response(**result_dict)
 
 
 @app.route('/ping_webhook', methods=['GET'])
@@ -151,18 +195,46 @@ def update_webhook_ingress():
 def update_security_perimeter():
   app.logger.info('update_security_perimeter:')
   content = request.get_json(silent=True)
-  restrict_cloudfunctions = content.get('restrict_cloudfunctions', True)
-  app.logger.info(f'  restrict_cloudfunctions: {restrict_cloudfunctions}')
-  restrict_dialogflow = content.get('restrict_dialogflow', True)
-  app.logger.info(f'  restrict_dialogflow: {restrict_dialogflow}')
+  api = content['api']
+  app.logger.info(f'  api: {api}')
+  restricted = content['restricted']
+  app.logger.info(f'  restricted: {restricted}')
   result_dict = tasks.update_security_perimeter(
     invoke.Context(),
     config_file=CONFIG_FILE, build_dir=BUILD_DIR,
-    restrict_cloudfunctions=restrict_cloudfunctions,
-    restrict_dialogflow=restrict_dialogflow,
+    api=api,
+    restricted=restricted,
     sa_name=SA_NAME,
   )
-  app.logger.info(f'  update_security_perimeter: TODO STATUS CODE')
+  app.logger.info(f'  update_security_perimeter: {result_dict["status"]}')
+  return Response(**result_dict)
+
+
+@app.route('/update_agent_webhook', methods=['POST'])
+def update_agent_webhook():
+  app.logger.info('update_agent_webhook:')
+  content = request.get_json(silent=True)
+  fulfillment = content['fulfillment']
+  app.logger.info(f'  fulfillment: {fulfillment}')
+  result_dict = tasks.update_agent_webhook(
+    invoke.Context(),
+    fulfillment=fulfillment,
+    config_file=CONFIG_FILE, build_dir=BUILD_DIR,
+    sa_name=SA_NAME,
+  )
+  app.logger.info(f'  update_security_perimeter: {result_dict["status"]}')
+  return Response(**result_dict)
+
+
+@app.route('/get_status', methods=['GET'])
+def get_status():
+  app.logger.info('get_status:')
+  result_dict = tasks.get_status(
+    invoke.Context(),
+    config_file=CONFIG_FILE, build_dir=BUILD_DIR,
+    sa_name=SA_NAME,
+  )
+  app.logger.info(f'  get_status: {result_dict["status"]}')
   return Response(**result_dict)
 
 

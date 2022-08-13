@@ -1,0 +1,12 @@
+<!doctype html>
+<html>
+  <head>
+    <title>Turbo-Flask Streams Demo</title>
+    {{ turbo() }}
+  </head>
+  <body>
+    cloudfunctions_restricted: {% include "cloudfunctions_restricted.html" %}
+    dialogflow_restricted: {% include "dialogflow_restricted.html" %}
+    {% block content %}{% endblock %}
+  </body>
+</html>

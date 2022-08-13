@@ -1,8 +1,6 @@
-{% if backend_debug %}
+
 export SERVER='localhost:5000'
-{% else %}
-export SERVER=$(gcloud run services describe {{DEMO_BACKEND_SERVER}} --platform managed --region {{REGION}} --format "value(status.url)")
-{% endif %}
+
 
 
 # curl -X POST \
@@ -27,7 +25,7 @@ curl -s -i -X POST \
       }
     }
   }' \
-  {{WEBHOOK_TRIGGER_URI}} | grep "^HTTP\/")
+  https://us-central1-vpc-sc-demo-nicholascain14.cloudfunctions.net/custom-telco-webhook | grep "^HTTP\/")
 
 
 # Test the webhook directly, authenticated:
@@ -46,7 +44,7 @@ curl -s -i -X POST \
       }
     }
   }' \
-  {{WEBHOOK_TRIGGER_URI}} | grep "^HTTP\/")
+  https://us-central1-vpc-sc-demo-nicholascain14.cloudfunctions.net/custom-telco-webhook | grep "^HTTP\/")
 
 # Test the webhook within, not authenticated:
 echo "Internal not authenticated: " $(\
