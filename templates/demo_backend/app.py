@@ -70,6 +70,7 @@ def poll_restricted_services():
       status.cloudfunctions_restricted = result_dict['cloudfunctions_restricted']
       status.dialogflow_restricted = result_dict['dialogflow_restricted']
     else:
+      app.logger.info(f'poll_restricted_services: {result["status"]} {result["response"]}')
       status.cloudfunctions_restricted = 'ERROR'
       status.dialogflow_restricted = 'ERROR'
 
@@ -91,6 +92,7 @@ def poll_service_directory_webhook_fulfillment():
       result_dict = json.loads(result['response'])
       status.service_directory_webhook_fulfillment = result_dict['service_directory_webhook_fulfillment']
     else:
+      app.logger.info(f'poll_service_directory_webhook_fulfillment: {result["status"]} {result["response"]}')
       status.service_directory_webhook_fulfillment = 'ERROR'
 
 
@@ -110,6 +112,7 @@ def poll_webhook_ingress_internal_only():
       result_dict = json.loads(result['response'])
       status.webhook_ingress_internal_only = result_dict['webhook_ingress_internal_only']
     else:
+      app.logger.info(f'poll_webhook_ingress_internal_only: {result["status"]} {result["response"]}')
       status.webhook_ingress_internal_only = 'ERROR'
 
 
@@ -129,6 +132,7 @@ def poll_webhook_access_allow_unauthenticated():
       result_dict = json.loads(result['response'])
       status.webhook_access_allow_unauthenticated = result_dict['webhook_access_allow_unauthenticated']
     else:
+      app.logger.info(f'poll_webhook_access_allow_unauthenticated: {result["status"]} {result["response"]}')
       status.webhook_access_allow_unauthenticated = 'ERROR'
 
 

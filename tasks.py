@@ -80,6 +80,7 @@ import requests
 import time
 import uuid
 import base64
+import os
 
 BUILD_DIR_DEFAULT = './build'
 REGION_DEFAULT = 'us-central1'
@@ -180,6 +181,7 @@ def setup(c,
   c.run(f"mkdir -p {build_dir}/keys")
   c.run(f"mkdir -p {build_dir}/demo_backend")
   c.run(f"mkdir -p {build_dir}/demo_backend/templates")
+  c.run(f"mkdir -p {build_dir}/demo_backend/keys")
 
   login(c, principal)
   set_project(c, project_id)
@@ -919,18 +921,19 @@ def deploy_demo(c,
   set_project(c, settings["PROJECT_ID"])
   login_sa(c, settings["SETUP_SA_NAME"], build_dir)
 
-  for filename in ['Dockerfile', 'Procfile', 'requirements.txt']:
+  for filename in ['Dockerfile', 'Procfile', 'requirements.txt', 'app.py']:
     c.run(f'cp {template_dir/"demo_backend"/filename} {build_dir/"demo_backend"/filename}')
-  for filename in ['index.html']:
+
+  for filename in os.listdir(template_dir/"demo_backend/templates"):
     c.run(f'cp {template_dir/"demo_backend/templates"/filename} {build_dir/"demo_backend/templates"/filename}')
-  for filename in ['app.py']:
-    src = template_dir/'demo_backend'/f'{filename}.j2'
-    tgt = build_dir/'demo_backend'/f'{filename}'
-    apply_template(src, tgt, settings)
+
+  src = template_dir/"demo_backend/env.list.j2"
+  tgt = build_dir/"demo_backend/env.list"
+  apply_template(src, tgt, settings)
 
   c.run(f'cp tasks.py {build_dir/"demo_backend/tasks.py"}')
   c.run(f'cp {build_dir/config_file} {build_dir/"demo_backend/config.json"}')
-  c.run(f'cp {build_dir/"keys"/settings["DEMO_BACKEND_SA_NAME"]} {build_dir/"demo_backend"/settings["DEMO_BACKEND_SA_NAME"]}')
+  c.run(f'cp {build_dir/"keys"/settings["DEMO_BACKEND_SA_NAME"]} {build_dir/"demo_backend/keys"/settings["DEMO_BACKEND_SA_NAME"]}')
   if prod:
     c.run(f'gcloud builds submit {build_dir/"demo_backend"} --tag={settings["DEMO_BACKEND_SERVER_IMAGE_URI"]} --gcs-log-dir=gs://{settings["PROJECT_ID"]}/{settings["DEMO_BACKEND_SERVER_IMAGE"]}-build-logs')
     c.run(f'gcloud run deploy --allow-unauthenticated {settings["DEMO_BACKEND_SERVER"]} \
@@ -942,7 +945,7 @@ def deploy_demo(c,
       --vpc-connector={settings["DEMO_BACKEND_VPC_CONNECTOR"]} \
       --vpc-egress=all-traffic')
   else:
-    c.run(f'cd {build_dir/"demo_backend"} && sudo docker run -p 127.0.0.1:5000:5000 --rm -it $(sudo docker build -q .)', pty=True)
+    c.run(f'cd {build_dir/"demo_backend"} && sudo docker run --env-file env.list -p 127.0.0.1:5000:5000 --rm -it $(sudo docker build -q .)', pty=True)
 
 
 @task
@@ -955,6 +958,7 @@ def get_status(c,
   webhook_ingress=True,
   webhook_access=True,
   skip_setup=False,
+  quiet=True,
 ):
   settings = source(c, config_file, build_dir, stdout=False)
   if not skip_setup:
@@ -990,7 +994,7 @@ def get_status(c,
 
   # Webhook Ingress:
   if webhook_ingress:
-    result = c.run(f'gcloud functions describe {settings["WEBHOOK_NAME"]} --format json', warn=True, hide=True)
+    result = c.run(f'gcloud functions describe --project {settings["PROJECT_ID"]} {settings["WEBHOOK_NAME"]} --format json', warn=True, hide=True)
     if 'error' in result.stderr.lower():
       return {'status': 500, 'response':result.stderr.strip()}
     result_dict = json.loads(result.stdout.strip())
@@ -1001,7 +1005,7 @@ def get_status(c,
 
   # Webhook Access:
   if webhook_access:
-    result = c.run(f'gcloud functions get-iam-policy {settings["WEBHOOK_NAME"]} --format json', hide=True, warn=True)
+    result = c.run(f'gcloud functions get-iam-policy --project {settings["PROJECT_ID"]} {settings["WEBHOOK_NAME"]} --format json', hide=True, warn=True)
     if 'error' in result.stderr.lower():
       return {'status': 500, 'response':result.stderr.strip()}
     policy_dict = json.loads(result.stdout.strip())
@@ -1015,5 +1019,7 @@ def get_status(c,
     else:
       status_dict['webhook_access_allow_unauthenticated'] = False
 
+  if not quiet:
+    print({'status':200, 'response':json.dumps(status_dict)})
   return {'status':200, 'response':json.dumps(status_dict)}
   

@@ -16,9 +16,10 @@ RUN pip install -r requirements.txt
 EXPOSE 5000
 
 # copy every content from the local file to the image
-COPY ./app.py /app/app.py
-COPY ./tasks.py /app/tasks.py
-COPY ./config.json /app/config.json
-COPY ./demo-backend /app/keys/demo-backend
+COPY app.py /app/app.py
+COPY tasks.py /app/tasks.py
+COPY config.json /app/config.json
+COPY keys/demo-backend /app/keys/demo-backend
+COPY templates/ /app/templates/
 
 CMD exec gunicorn --bind=0.0.0.0:5000 --workers=1 --threads=8 --log-level=info app:app
