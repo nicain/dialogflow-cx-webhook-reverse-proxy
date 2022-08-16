@@ -21,5 +21,6 @@ COPY tasks.py /app/tasks.py
 COPY config.json /app/config.json
 COPY keys/demo-backend /app/keys/demo-backend
 COPY templates/ /app/templates/
+COPY frontend/ /app/frontend/
 
 CMD exec gunicorn --bind=0.0.0.0:5000 --workers=1 --threads=8 --log-level=info app:app

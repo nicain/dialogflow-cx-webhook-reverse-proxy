@@ -1,5 +1,4 @@
-from flask import Flask, request, Response, abort, render_template
-from turbo_flask import Turbo
+from flask import Flask, request, Response, abort, render_template, send_from_directory
 import os
 import tasks
 import invoke
@@ -12,8 +11,10 @@ import threading
 from google.oauth2 import id_token
 from google.auth.transport import requests as reqs
 
-app = Flask(__name__)
-turbo = Turbo(app)
+app = Flask(__name__, static_folder='frontend/build')
+if (os.getenv('CORS', 'False') == 'True'):
+  from flask_cors import CORS
+  CORS(app)
 gunicorn_logger = logging.getLogger('gunicorn.error')
 app.logger.handlers = gunicorn_logger.handlers
 app.logger.setLevel(gunicorn_logger.level)
@@ -31,15 +32,15 @@ authorized_emails = [
     f'{SA_NAME}@{PROJECT_ID}.iam.gserviceaccount.com',
 ]
 
-def update_project_status():
-  with app.app_context():
-    while True:
-      time.sleep(1)
-      turbo.push(turbo.replace(render_template('cloudfunctions_restricted.html'), 'cloudfunctions_restricted_anchor'))
-      turbo.push(turbo.replace(render_template('dialogflow_restricted.html'), 'dialogflow_restricted_anchor'))
-      turbo.push(turbo.replace(render_template('service_directory_webhook_fulfillment.html'), 'service_directory_webhook_fulfillment_anchor'))
-      turbo.push(turbo.replace(render_template('webhook_ingress_internal_only.html'), 'webhook_ingress_internal_only_anchor'))
-      turbo.push(turbo.replace(render_template('webhook_access_allow_unauthenticated.html'), 'webhook_access_allow_unauthenticated_anchor'))
+# def update_project_status():
+#   with app.app_context():
+#     while True:
+#       time.sleep(1)
+#       turbo.push(turbo.replace(render_template('cloudfunctions_restricted.html'), 'cloudfunctions_restricted_anchor'))
+#       turbo.push(turbo.replace(render_template('dialogflow_restricted.html'), 'dialogflow_restricted_anchor'))
+#       turbo.push(turbo.replace(render_template('service_directory_webhook_fulfillment.html'), 'service_directory_webhook_fulfillment_anchor'))
+#       turbo.push(turbo.replace(render_template('webhook_ingress_internal_only.html'), 'webhook_ingress_internal_only_anchor'))
+#       turbo.push(turbo.replace(render_template('webhook_access_allow_unauthenticated.html'), 'webhook_access_allow_unauthenticated_anchor'))
 
 
 class ProjectStatus:
@@ -140,22 +141,36 @@ def poll_webhook_access_allow_unauthenticated():
 
 @app.before_first_request
 def other_before_first_request():
-    threading.Thread(target=update_project_status).start()
+    # threading.Thread(target=update_project_status).start()
     threading.Thread(target=poll_restricted_services).start()
     threading.Thread(target=poll_service_directory_webhook_fulfillment).start()
     threading.Thread(target=poll_webhook_ingress_internal_only).start()
     threading.Thread(target=poll_webhook_access_allow_unauthenticated).start()
 
 
-@app.context_processor
-def inject_status_into_context():
-    return {
-      'cloudfunctions_restricted': status.cloudfunctions_restricted,
-      'dialogflow_restricted':  status.dialogflow_restricted,
-      'service_directory_webhook_fulfillment': status.service_directory_webhook_fulfillment,
-      'webhook_ingress_internal_only':  status.webhook_ingress_internal_only,
-      'webhook_access_allow_unauthenticated':  status.webhook_access_allow_unauthenticated,
-    }
+@app.route('/cloudfunctions_restricted_status', methods=['GET'])
+def cloudfunctions_restricted_status():
+  return Response(status=200, response=json.dumps({'status':status.cloudfunctions_restricted}))
+
+
+@app.route('/dialogflow_restricted_status', methods=['GET'])
+def dialogflow_restricted_status():
+  return Response(status=200, response=json.dumps({'status':status.dialogflow_restricted}))
+
+
+@app.route('/service_directory_webhook_fulfillment_status', methods=['GET'])
+def service_directory_webhook_fulfillment_status():
+  return Response(status=200, response=json.dumps({'status':status.service_directory_webhook_fulfillment}))
+
+
+@app.route('/webhook_ingress_internal_only_status', methods=['GET'])
+def webhook_ingress_internal_only_status():
+  return Response(status=200, response=json.dumps({'status':status.webhook_ingress_internal_only}))
+
+
+@app.route('/webhook_access_allow_unauthenticated', methods=['GET'])
+def webhook_access_allow_unauthenticated():
+  return Response(status=200, response=json.dumps({'status':status.webhook_access_allow_unauthenticated}))
 
 
 # @app.before_request
@@ -210,11 +225,6 @@ def check_user_authentication():
   if verified_email not in authorized_emails:
     return abort(403)
   app.logger.info(f'[0]   Authorized: {verified_email}')
-
-
-@app.route('/')
-def home():
-  return render_template('index.html')
 
 
 @app.route('/configuration', methods=['GET'])
@@ -339,7 +349,34 @@ def get_status():
   app.logger.info(f'  get_status: {result_dict["status"]}')
   return Response(**result_dict)
 
+# Serve React App
+@app.route('/', defaults={'path': ''})
+@app.route('/<path:path>')
+def serve(path):
+    if path != "" and os.path.exists(app.static_folder + '/' + path):
+        return send_from_directory(app.static_folder, path)
+    else:
+        return send_from_directory(app.static_folder, 'index.html')
+
 
 if __name__ == "__main__":
     port = int(os.environ.get('PORT', 5000))
     app.run(debug=True, host='0.0.0.0', port=port)
+
+
+# @app.context_processor
+# def inject_status_into_context():
+#     return {
+#       'cloudfunctions_restricted': status.cloudfunctions_restricted,
+#       'dialogflow_restricted':  status.dialogflow_restricted,
+#       'service_directory_webhook_fulfillment': status.service_directory_webhook_fulfillment,
+#       'webhook_ingress_internal_only':  status.webhook_ingress_internal_only,
+#       'webhook_access_allow_unauthenticated':  status.webhook_access_allow_unauthenticated,
+#     }
+# turbo = Turbo(app)
+# from turbo_flask import Turbo
+
+
+# @app.route('/')
+# def home():
+#   return render_template('index.html')

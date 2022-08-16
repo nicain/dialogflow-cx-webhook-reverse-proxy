@@ -180,7 +180,7 @@ def setup(c,
   c.run(f"mkdir -p {build_dir}/server/ssl")
   c.run(f"mkdir -p {build_dir}/keys")
   c.run(f"mkdir -p {build_dir}/demo_backend")
-  c.run(f"mkdir -p {build_dir}/demo_backend/templates")
+  # c.run(f"mkdir -p {build_dir}/demo_backend/templates")
   c.run(f"mkdir -p {build_dir}/demo_backend/keys")
 
   login(c, principal)
@@ -924,8 +924,8 @@ def deploy_demo(c,
   for filename in ['Dockerfile', 'Procfile', 'requirements.txt', 'app.py']:
     c.run(f'cp {template_dir/"demo_backend"/filename} {build_dir/"demo_backend"/filename}')
 
-  for filename in os.listdir(template_dir/"demo_backend/templates"):
-    c.run(f'cp {template_dir/"demo_backend/templates"/filename} {build_dir/"demo_backend/templates"/filename}')
+  c.run(f'rm -r {build_dir/"demo_backend/frontend"}')
+  c.run(f'cp -r {template_dir/"demo_backend/frontend"} {build_dir/"demo_backend/frontend"}')
 
   src = template_dir/"demo_backend/env.list.j2"
   tgt = build_dir/"demo_backend/env.list"
@@ -945,6 +945,7 @@ def deploy_demo(c,
       --vpc-connector={settings["DEMO_BACKEND_VPC_CONNECTOR"]} \
       --vpc-egress=all-traffic')
   else:
+    c.run(f'cd {build_dir/"demo_backend/frontend"} && npm run build')
     c.run(f'cd {build_dir/"demo_backend"} && sudo docker run --env-file env.list -p 127.0.0.1:5000:5000 --rm -it $(sudo docker build -q .)', pty=True)
 
 
