@@ -934,6 +934,7 @@ def deploy_demo(c,
   c.run(f'cp tasks.py {build_dir/"demo_backend/tasks.py"}')
   c.run(f'cp {build_dir/config_file} {build_dir/"demo_backend/config.json"}')
   c.run(f'cp {build_dir/"keys"/settings["DEMO_BACKEND_SA_NAME"]} {build_dir/"demo_backend/keys"/settings["DEMO_BACKEND_SA_NAME"]}')
+  c.run(f'cd {build_dir/"demo_backend/frontend"} && npm run build')
   if prod:
     c.run(f'gcloud builds submit {build_dir/"demo_backend"} --tag={settings["DEMO_BACKEND_SERVER_IMAGE_URI"]} --gcs-log-dir=gs://{settings["PROJECT_ID"]}/{settings["DEMO_BACKEND_SERVER_IMAGE"]}-build-logs')
     c.run(f'gcloud run deploy --allow-unauthenticated {settings["DEMO_BACKEND_SERVER"]} \
@@ -943,9 +944,9 @@ def deploy_demo(c,
       --port=5000 \
       --ingress=all \
       --vpc-connector={settings["DEMO_BACKEND_VPC_CONNECTOR"]} \
+      --env-vars-file={build_dir/"demo_backend/env.yaml"} \
       --vpc-egress=all-traffic')
   else:
-    c.run(f'cd {build_dir/"demo_backend/frontend"} && npm run build')
     c.run(f'cd {build_dir/"demo_backend"} && sudo docker run --env-file env.list -p 127.0.0.1:5000:5000 --rm -it $(sudo docker build -q .)', pty=True)
 
 

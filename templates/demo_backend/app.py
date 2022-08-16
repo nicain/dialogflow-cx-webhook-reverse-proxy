@@ -7,12 +7,13 @@ import logging
 import time
 import json
 import threading
+from distutils.util import strtobool
 
 from google.oauth2 import id_token
 from google.auth.transport import requests as reqs
 
 app = Flask(__name__, static_folder='frontend/build')
-if (os.getenv('CORS', 'False') == 'True'):
+if strtobool(os.getenv("CORS", "true")):
   from flask_cors import CORS
   CORS(app)
 gunicorn_logger = logging.getLogger('gunicorn.error')

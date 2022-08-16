@@ -8,7 +8,7 @@ const queryClient = new QueryClient();
 function CloudfunctionsStatus() {
   const { isLoading, error, data} = useQuery("cloudfunctions_status", () =>
     axios
-      .get("http://localhost:5000/cloudfunctions_restricted_status")
+      .get("/cloudfunctions_restricted_status")
       .then((res) => res.data),   {
         refetchInterval: 1000,
       }
@@ -22,7 +22,7 @@ function CloudfunctionsStatus() {
         cloudfunctions.googleapis.com: 
         </div>
         <div style={{ float: "left", paddingRight: "5px", justifyContent: 'center',}}>
-          {data==null ? "unknown" : data.toString()}
+          {data.status==null ? "unknown" : data.status.toString()}
         </div>
       </div>
   );
@@ -31,7 +31,7 @@ function CloudfunctionsStatus() {
 function DialogflowStatus() {
   const { isLoading, error, data} = useQuery("dialogflow_status", () =>
     axios
-      .get("http://localhost:5000/dialogflow_restricted_status")
+      .get("/dialogflow_restricted_status")
       .then((res) => res.data),   {
         refetchInterval: 1000,
       }
@@ -45,7 +45,7 @@ function DialogflowStatus() {
         dialgflow.googleapis.com: 
         </div>
         <div style={{ float: "left", paddingRight: "5px", justifyContent: 'center',}}>
-          {data==null ? "unknown" : data.toString()}
+          {data.status==null ? "unknown" : data.status.toString()}
         </div>
       </div>
   );
@@ -54,7 +54,7 @@ function DialogflowStatus() {
 function ServiceDirectoryWebhookFulfillmentStatus() {
   const {isLoading, error, data} = useQuery("service_directory_webhook_fulfillment_status", () =>
     axios
-      .get("http://localhost:5000/service_directory_webhook_fulfillment_status")
+      .get("/service_directory_webhook_fulfillment_status")
       .then((res) => res.data),   {
         refetchInterval: 1000,
         onSuccess: (data) => {
@@ -90,7 +90,7 @@ function SetWebhookFulfillmentServiceDirectory() {
   const { isFetching, isError, refetch } = useQuery('key', 
   () =>
   axios
-    .post("http://localhost:5000/update_agent_webhook", {"fulfillment": "service-directory"})
+    .post("/update_agent_webhook", {"fulfillment": "service-directory"})
     .then((res) => res.data),
   {enabled:false})
   if (isFetching) {
@@ -113,7 +113,7 @@ function SetWebhookFulfillmentGeneric() {
   const { isFetching, isError, refetch } = useQuery('key', 
   () =>
   axios
-    .post("http://localhost:5000/update_agent_webhook", {"fulfillment": "generic-web-service"})
+    .post("/update_agent_webhook", {"fulfillment": "generic-web-service"})
     .then((res) => res.data),
   {enabled:false})
   if (isFetching) {
@@ -136,7 +136,7 @@ function SetWebhookFulfillmentGeneric() {
 function WebhookIngressInternalOnlyStatus() {
   const {isLoading, error, data} = useQuery("webhook_ingress_internal_only_status", () =>
     axios
-      .get("http://localhost:5000/webhook_ingress_internal_only_status")
+      .get("/webhook_ingress_internal_only_status")
       .then((res) => res.data),   {
         refetchInterval: 1000,
         onSuccess: (data) => {
@@ -173,7 +173,7 @@ function WebhookIngressInternalOnlyTrue() {
   const { isFetching, isError, refetch } = useQuery('key', 
   () =>
   axios
-    .post("http://localhost:5000/update_webhook_ingress", {"internal_only": true})
+    .post("/update_webhook_ingress", {"internal_only": true})
     .then((res) => res.data),
   {enabled:false})
   if (isFetching) {
@@ -196,7 +196,7 @@ function WebhookIngressInternalOnlyFalse() {
   const { isFetching, isError, refetch } = useQuery('key', 
   () =>
   axios
-    .post("http://localhost:5000/update_webhook_ingress", {"internal_only": false})
+    .post("/update_webhook_ingress", {"internal_only": false})
     .then((res) => res.data),
   {enabled:false})
   if (isFetching) {
@@ -218,7 +218,7 @@ function WebhookIngressInternalOnlyFalse() {
 function WebhookAccessAllowUnauthenticated() {
   const {isLoading, error, data} = useQuery("update_webhook_access", () =>
     axios
-      .get("http://localhost:5000/webhook_access_allow_unauthenticated")
+      .get("/webhook_access_allow_unauthenticated")
       .then((res) => res.data),   {
         refetchInterval: 1000,
         onSuccess: (data) => {
@@ -255,7 +255,7 @@ function WebhookAccessAllowUnauthenticatedTrue() {
   const { isFetching, isError, refetch } = useQuery('key', 
   () =>
   axios
-    .post("http://localhost:5000/update_webhook_access", {"allow_unauthenticated": true})
+    .post("/update_webhook_access", {"allow_unauthenticated": true})
     .then((res) => res.data),
   {enabled:false})
   if (isFetching) {
@@ -278,7 +278,7 @@ function WebhookAccessAllowUnauthenticatedFalse() {
   const { isFetching, isError, refetch } = useQuery('key', 
   () =>
   axios
-    .post("http://localhost:5000/update_webhook_access", {"allow_unauthenticated": false})
+    .post("/update_webhook_access", {"allow_unauthenticated": false})
     .then((res) => res.data),
   {enabled:false})
   if (isFetching) {
@@ -354,7 +354,7 @@ export default function App() {
 //   const [errorMessage, setErrorMessage] = useState("");
 //   const handleFetch = () => {
 //     setIsLoading(true);
-//     fetch("http://localhost:5000/get_status?restricted_services=true")
+//     fetch("/get_status?restricted_services=true")
 //       .then((respose) => respose.json())
 //       .then((respose) => {
 //         setService(respose)
@@ -388,7 +388,7 @@ export default function App() {
 //       setCount(count + 1);
 //     }, delay);
 
-//     // const foo = fetch("http://localhost:5000/get_status?restricted_services=true")
+//     // const foo = fetch("/get_status?restricted_services=true")
 //     // .then((respose) => respose.json())
   
 //     return (
@@ -441,7 +441,7 @@ export default function App() {
 // function Example() {
 //   const { isLoading, error, data, refetch} = useQuery("example", () =>
 //     axios
-//       .get("http://localhost:5000/get_status?restricted_services=true")
+//       .get("/get_status?restricted_services=true")
 //       .then((res) => res.data),   {
 //         refetchInterval: 1000,
 //       }
