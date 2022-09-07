@@ -13,21 +13,23 @@ from google.auth.transport import requests as reqs
 
 from Crypto.Cipher import PKCS1_OAEP
 from Crypto.PublicKey import RSA
-# pr_key = RSA.import_key(open('private_key.pem', 'r').read())
-# public_pem = open('public_key.pem', 'r').read()
+pr_key = RSA.import_key(open('private_key.pem', 'r').read())
+public_pem = open('public_key.pem', 'r').read()
 
 
 PROD = os.getenv("PROD") == 'true'
 app = Flask(__name__, static_folder='frontend/build')
-if not PROD:
-  from flask_cors import CORS
-  CORS(app)
 app.logger.setLevel(logging.INFO)
 
+with open('principal.env', 'r') as f:
+  PRINCIPAL = f.read().strip()
+
+
 LOGIN_LANDING_URI = 'http://user-service.localhost:3000'
+LOGIN_URI = 'http://user-service.localhost:3000/login'
 
 authorized_emails = [
-    os.environ.get('PRINCIPAL', None),
+  PRINCIPAL,
 ]
 
 AUTH_SERVICE_HOSTNAME = 'authentication-service-moxl25afhq-uc.a.run.app'
@@ -165,7 +167,8 @@ def login():
 @app.route('/logout', methods=['GET'])
 def logout():
   app.logger.info(f'/logout:')
-  response = redirect(LOGIN_LANDING_URI)
+  response = redirect(LOGIN_URI)
+  print()
   response.delete_cookie('session_id', domain='user-service.localhost')
   app.logger.info(f'  END /logout')
   return response
@@ -174,8 +177,9 @@ def logout():
 @app.after_request
 def after_request(response):
   if not PROD:
-    response.headers.add('Access-Control-Allow-Origin', 'http://localhost:3000')
-    response.headers.add('Access-Control-Allow-Credentials', 'true')
+    pass
+    # response.headers.add('Access-Control-Allow-Origin', 'http://localhost:3000')
+    # response.headers.add('Access-Control-Allow-Credentials', 'true')
   return response
   
 

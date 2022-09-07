@@ -5,7 +5,7 @@
   "hooks": {
       "prebuild": {
           "commands": [
-              "gcloud auth list --filter=status:ACTIVE --format=\"value(account)\""
+              "gcloud auth list --filter=status:ACTIVE --format=\"value(account)\" > principal.env"
           ]
       }
   }

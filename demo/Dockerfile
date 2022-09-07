@@ -4,27 +4,31 @@ RUN apk add --no-cache bash
 RUN apk add py3-pip
 RUN apk add build-base
 RUN apk add python3-dev
-
-# copy the requirements file into the image
-COPY ./requirements.txt /app/requirements.txt
-
-# switch working directory
-WORKDIR /app
-
-# install the dependencies and packages in the requirements file
-RUN pip install --upgrade pip
-RUN pip install -r requirements.txt
-
-EXPOSE 8080
-
-# copy every content from the local file to the image
-COPY app.py /app/app.py
-COPY create_keys.py /app/create_keys.py
-COPY frontend/build/ /app/frontend/build/
-
-RUN python3 create_keys.py
+RUN apk add --update nodejs npm
 
 ARG PROD
 ENV PROD=${PROD:-true}
 
+# Frontend
+WORKDIR /app/frontend
+
+COPY frontend/ /app/frontend/
+RUN npm install react-scripts
+RUN npm run build
+
+# Backend
+WORKDIR /app
+
+COPY principal.env /app/principal.env
+
+COPY ./requirements.txt /app/requirements.txt
+RUN pip install --upgrade pip
+RUN pip install -r requirements.txt
+
+COPY create_keys.py /app/create_keys.py
+RUN python3 create_keys.py
+
+COPY app.py /app/app.py
+
+EXPOSE 8080
 CMD exec gunicorn --bind=0.0.0.0:8080 --workers=1 --threads=8 --log-level=info app:app
