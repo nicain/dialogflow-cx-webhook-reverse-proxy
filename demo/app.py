@@ -104,6 +104,7 @@ def webhook_response_ok(response_dict):
 
 
 def get_token(request, token_type='access'):
+
   params = {
     'session_id': request.cookies.get("session_id"),
     'origin': request.host_url,
@@ -155,7 +156,6 @@ def get_token(request, token_type='access'):
 @app.route('/session', methods=['GET'])
 def login():
   app.logger.info(f'/session:')
-
   session_id = uuid.uuid4().hex
   state = b64encode(json.dumps({'return_to': LOGIN_LANDING_URI, 'session_id':session_id, 'public_pem':public_pem}).encode()).decode()
   response = redirect(f'{AUTH_SERVICE_LOGIN_ENDPOINT}?state={state}')
@@ -164,11 +164,15 @@ def login():
   return response
 
 
+@app.route('/foo', methods=['GET'])
+def foo():
+  return Response(status=200, response=f'{request.host_url}')
+
+
 @app.route('/logout', methods=['GET'])
 def logout():
   app.logger.info(f'/logout:')
   response = redirect(LOGIN_URI)
-  print()
   response.delete_cookie('session_id', domain='user-service.localhost')
   app.logger.info(f'  END /logout')
   return response
@@ -568,7 +572,6 @@ def info():
   if not token:
     return Response(status=401, response='NO_TOKEN')
   info = id_token.verify_oauth2_token(token, reqs.Request())
-  print(info)
   
 
   return Response(status=200, response=json.dumps({
