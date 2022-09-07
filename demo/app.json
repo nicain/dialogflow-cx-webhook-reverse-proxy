@@ -1,0 +1,12 @@
+
+
+{
+  "name": "vpc-sc-live-demo",
+  "hooks": {
+      "prebuild": {
+          "commands": [
+              "gcloud auth list --filter=status:ACTIVE --format=\"value(account)\""
+          ]
+      }
+  }
+}
