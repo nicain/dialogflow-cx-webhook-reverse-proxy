@@ -51,3 +51,8 @@ button:hover {
 .error {
   color: red;
 }
+
+.react-pdf__Page.prevPage {
+  position: absolute !important;
+  z-index: 1;
+}

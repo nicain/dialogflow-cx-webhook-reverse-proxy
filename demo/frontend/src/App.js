@@ -24,6 +24,7 @@ import {StatusTutorialMode, ToggleStatusTutorialMode} from "./TutorialMode.js"
 import { Document, Page } from 'react-pdf';
 import diagram_sd from './VPC_SC_diagram_latest.pdf';
 import {QueryInfo} from './Info.js'
+import './styles.css';
 
 
 
@@ -225,11 +226,26 @@ function allStatesToPageInfo(allStates) {
 function StateImages(props) {
   const pageHeight = 300
   return(
-  <Box sx={{ width: "75%"}} display="flex" justifyContent="center" alignItems="center" margin="auto">
-    <Document file={diagram_sd}>
-      <Page pageNumber={props.curr_page} height={pageHeight} loading={<div><Box sx={{ width: "75%"}} display="flex" justifyContent="center" alignItems="center" margin="auto"><Paper variant="string" sx={{ width: "75%", height:pageHeight}}></Paper></Box></div>}/>
-    </Document>
-  </Box>
+  <Document file={diagram_sd}>
+    <Box sx={{ width: "75%"}} display="flex" justifyContent="center" alignItems="center" margin="auto">
+      {props.isLoading && props.renderedPageNumber ? (
+        <Page 
+            key={props.renderedPageNumber}
+            className="prevPage"
+            pageNumber={props.renderedPageNumber} 
+            height={pageHeight}
+            loading={<div><Box sx={{ width: "75%"}} display="flex" justifyContent="center" alignItems="center" margin="auto"><Paper variant="string" sx={{ width: "75%", height:pageHeight}}></Paper></Box></div>}
+          />
+        ) : null}
+        <Page
+          key={props.curr_page}
+          pageNumber={props.curr_page}
+          height={pageHeight}
+          onRenderSuccess={() => {props.setRenderedPageNumber(props.curr_page)}}
+          loading={<div><Box sx={{ width: "75%"}} display="flex" justifyContent="center" alignItems="center" margin="auto"><Paper variant="string" sx={{ width: "75%", height:pageHeight}}></Paper></Box></div>}
+        />
+    </Box>
+  </Document>
 )}
 
 function InfoBanner(props) {
@@ -254,6 +270,8 @@ function Home() {
   const [liveMode, setLiveMode] = useState(false);
   const [projectInfo, setProjectInfo] = useState({});
   const [pageNumber, setPageNumber] = useState(33);
+  const [renderedPageNumber, setRenderedPageNumber] = useState(null);
+
   const allStates = {
     dialogflowRestrictedState: null,
     cloudfunctionsRestrictedState: null,
@@ -271,6 +289,9 @@ function Home() {
   var webhookAccessState = NewInitState("webhookAccessState", allStates)
   var serviceDirectoryWebhookState = NewInitState("serviceDirectoryWebhookState", allStates)
   const curr_page = getPage(allStates, pageMapper) ? getPage(allStates, pageMapper) : 33
+
+  const isLoading = renderedPageNumber !== curr_page;
+
   return (
     <div>
       <h2>Home</h2>
@@ -278,7 +299,7 @@ function Home() {
       {<LiveMode liveMode={liveMode} setLiveMode={setLiveMode} allStates={allStates} projectInfo={projectInfo}/>}
       {<InfoBanner projectInfo={projectInfo} liveMode={liveMode}/>}
       {/* {<DebugPrintData data={allStatesToPageInfo(allStates)}/>} */}
-      {<StateImages curr_page={curr_page}/>}
+      {<StateImages curr_page={curr_page} isLoading={isLoading} renderedPageNumber={renderedPageNumber} setRenderedPageNumber={setRenderedPageNumber}/>}
       {<StateChangeButtonGrid 
         dialogflowRestrictedState={dialogflowRestrictedState}
         cloudfunctionsRestrictedState={cloudfunctionsRestrictedState}
