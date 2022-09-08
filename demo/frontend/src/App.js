@@ -19,34 +19,37 @@ import axios from "axios";
 import CircularProgress from '@mui/material/CircularProgress';
 import CachedIcon from '@mui/icons-material/Cached';
 import Switch from '@mui/material/Switch';
-import {ExecuteToggleStatus, QueryPollStatus, getPage, TIMER_SCALE} from "./StatusPollToggle.js"
+import {ExecuteToggleStatus, QueryPollStatus, TIMER_SCALE} from "./StatusPollToggle.js"
 import {StatusTutorialMode, ToggleStatusTutorialMode} from "./TutorialMode.js"
 import { Document, Page } from 'react-pdf';
 import diagram_sd from './VPC_SC_diagram_latest.pdf';
 import {QueryInfo} from './Info.js'
 import './styles.css';
+import {MiniDrawer} from './Drawer'
+import {DataModel, getPage} from "./DataModel.js";
 
 
-
-function DebugPrintData(props) {
-  const content = JSON.stringify(props.data, null, 2)
-  function onClick() {
-    return navigator.clipboard.writeText(content)
-  }
-  return(
-  <div>
-    <pre>
-      <Button sx={{ textAlign: 'left' }} onClick={onClick} variant="contained" color="primary" >{content}</Button> 
-    </pre>
-  </div>
+// function DebugPrintData(props) {
+//   const content = JSON.stringify(props.data, null, 2)
+//   function onClick() {
+//     return navigator.clipboard.writeText(content)
+//   }
+//   return(
+//   <div>
+//     <pre>
+//       <Button sx={{ textAlign: 'left' }} onClick={onClick} variant="contained" color="primary" >{content}</Button> 
+//     </pre>
+//   </div>
   
-)}
+// )}
 
 export default function App() {
+  const dataModel = DataModel();
   return (
     <BrowserRouter>
       <Routes>
-          <Route path="/" element={<Home />} />
+          {/* <Route path="/" element={<Home />} /> */}
+          <Route path="/" element={<MiniDrawer dataModel={dataModel}/>} />
           <Route path="/login" element={<Login />} />
        </Routes>
     </BrowserRouter>
@@ -75,8 +78,6 @@ function getControlElem(title, state, timeout, blocked_by_timeout, queryEndpoint
     toggleStatusElem = <ToggleStatusTutorialMode state={state}/>
   }
 
-  
-  
   return (
   <Grid container item direction='row' columnSpacing={3} justifyContent="flex-start" alignItems="center">
   <Box sx={{ width: 270 }}>

@@ -10,7 +10,6 @@ import io
 
 from urllib.parse import urlparse
 
-
 from google.oauth2 import id_token
 from google.auth.transport import requests as reqs
 
@@ -28,7 +27,6 @@ with open('principal.env', 'r') as f:
   PRINCIPAL = f.read().strip()
 
 def user_service_domain(request):
-  # app.logger.info(f'user_service_domain(request): request.host_url="{request.host_url}"')
   if request.host_url in ['http://localhost:5001/', 'http://localhost:8081/']:
     assert not PROD
     domain = 'user-service.localhost'
@@ -39,7 +37,6 @@ def user_service_domain(request):
   return domain
 
 def login_landing_uri(request):
-  # app.logger.info(f'login_landing_uri(request): request.host_url="{request.host_url}"')
   if request.host_url == 'http://localhost:5001/':
     assert not PROD
     landing_uri = 'http://user-service.localhost:3000'
@@ -191,6 +188,7 @@ def login():
   response = redirect(f'{AUTH_SERVICE_LOGIN_ENDPOINT}?state={state}')
   app.logger.info(f'  END /session')
   response.set_cookie("session_id", value=session_id, secure=True, httponly=True, domain=user_service_domain(request))
+  response.set_cookie("user_logged_in", value='true', secure=True, httponly=False, domain=user_service_domain(request))
   return response
 
 
@@ -199,6 +197,7 @@ def logout():
   app.logger.info(f'/logout:')
   response = redirect(login_landing_uri(request))
   response.delete_cookie('session_id', domain=user_service_domain(request))
+  response.delete_cookie('user_logged_in', domain=user_service_domain(request))
   app.logger.info(f'  END /logout')
   return response
   

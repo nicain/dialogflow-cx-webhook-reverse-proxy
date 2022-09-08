@@ -1,20 +1,20 @@
 import Switch from '@mui/material/Switch';
 
 function StatusTutorialMode(props) {
-  return (<div>{(props.state.status) ? "True" : "False"}</div>);
+  return (<div>{(props.state.status.current) ? "True" : "False"}</div>);
 }
 
 function ToggleStatusTutorialMode(props) {
 
   function onChange() {
-    props.state.setStatus(!props.state.status)
+    props.state.status.set(!props.state.status.current)
   }
 
   return (
     <>
       {<Switch
         onChange={onChange} 
-        checked={typeof(props.state.status) == "boolean" ? props.state.status : false}
+        checked={typeof(props.state.status.current) == "boolean" ? props.state.status.current : false}
         color="primary"
       />}
     </>

@@ -6,24 +6,25 @@ import CircularProgress from '@mui/material/CircularProgress';
 import {
   Navigate,
 } from "react-router-dom";
+import {getPage} from './DataModel.js';
 
 const TIMER_SCALE = 10;
 
 
-function getPage(allStates, pageMapper) {
-  const curr_array = [null, null, null, null, null]
-  for (var stateStr of allStates.stateNames) {
-    const idx = pageMapper.order.get(stateStr)
-    curr_array[idx] = allStates[stateStr].status
-  }
-  for (var ii = 0; ii < curr_array.length; ii++) {
-    if (curr_array[ii] !== "BLOCKED") {
-      pageMapper.stateCache[ii] = curr_array[ii]
-    }
-  }
-  // console.log(curr_array, pageMapper.stateCache, pageMapper.map.get(pageMapper.stateCache))
-  return pageMapper.map.get(pageMapper.stateCache)
-}
+// function getPage(allStates, pageMapper) {
+//   const curr_array = [null, null, null, null, null]
+//   for (var stateStr of allStates.stateNames) {
+//     const idx = pageMapper.order.get(stateStr)
+//     curr_array[idx] = allStates[stateStr].status
+//   }
+//   for (var ii = 0; ii < curr_array.length; ii++) {
+//     if (curr_array[ii] !== "BLOCKED") {
+//       pageMapper.stateCache[ii] = curr_array[ii]
+//     }
+//   }
+//   // console.log(curr_array, pageMapper.stateCache, pageMapper.map.get(pageMapper.stateCache))
+//   return pageMapper.map.get(pageMapper.stateCache)
+// }
 
 function ToggleStatus(props) {
   const changeRequested = useRef(false);
@@ -172,4 +173,4 @@ function QueryPollStatus(props) {
   )
 }
 
-export {ExecuteToggleStatus, QueryPollStatus, getPage, TIMER_SCALE}
+export {ExecuteToggleStatus, QueryPollStatus, TIMER_SCALE}
