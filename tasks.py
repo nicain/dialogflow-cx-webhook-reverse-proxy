@@ -943,6 +943,7 @@ def deploy_demo(c,
       --region {settings["REGION"]} \
       --port=5000 \
       --ingress=all \
+      --no-allow-unauthenticated \
       --vpc-connector={settings["DEMO_BACKEND_VPC_CONNECTOR"]} \
       --env-vars-file={build_dir/"demo_backend/env.yaml"} \
       --vpc-egress=all-traffic')
@@ -970,6 +971,7 @@ def get_status(c,
     login_sa(c, sa_name, build_dir)
 
   status_dict = {}
+  # print('foo', settings["ACCESS_POLICY_NAME"].split('/')[1], settings["SECURITY_PERIMETER"])
 
   # Restricted Services:
   if restricted_services:
@@ -1024,4 +1026,3 @@ def get_status(c,
   if not quiet:
     print({'status':200, 'response':json.dumps(status_dict)})
   return {'status':200, 'response':json.dumps(status_dict)}
-  

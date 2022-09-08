@@ -1,2 +1,8 @@
+demo-backend
 build
 **/__pycache__/
+private_key.pem
+public_key.pem
+principal.env
+templates
+launch

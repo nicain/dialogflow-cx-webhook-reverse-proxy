@@ -8,6 +8,9 @@ import uuid
 import zipfile
 import io
 
+from urllib.parse import urlparse
+
+
 from google.oauth2 import id_token
 from google.auth.transport import requests as reqs
 
@@ -24,9 +27,32 @@ app.logger.setLevel(logging.INFO)
 with open('principal.env', 'r') as f:
   PRINCIPAL = f.read().strip()
 
+def user_service_domain(request):
+  # app.logger.info(f'user_service_domain(request): request.host_url="{request.host_url}"')
+  if request.host_url in ['http://localhost:5001/', 'http://localhost:8081/']:
+    assert not PROD
+    domain = 'user-service.localhost'
+  else:
+    assert PROD
+    domain = urlparse(request.host_url).hostname
+  app.logger.info(f'user_service_domain(request): "{domain}"')
+  return domain
 
-LOGIN_LANDING_URI = 'http://user-service.localhost:3000'
-LOGIN_URI = 'http://user-service.localhost:3000/login'
+def login_landing_uri(request):
+  # app.logger.info(f'login_landing_uri(request): request.host_url="{request.host_url}"')
+  if request.host_url == 'http://localhost:5001/':
+    assert not PROD
+    landing_uri = 'http://user-service.localhost:3000'
+  elif request.host_url == 'http://localhost:8081/':
+    assert not PROD
+    landing_uri = 'http://user-service.localhost:8080'
+  else:
+    assert PROD
+    landing_uri = request.host_url
+  app.logger.info(f'login_landing_uri(request): landing_uri="{landing_uri}"')
+  return landing_uri
+
+
 
 authorized_emails = [
   PRINCIPAL,
@@ -105,6 +131,10 @@ def webhook_response_ok(response_dict):
 
 def get_token(request, token_type='access'):
 
+  if not request.cookies.get("session_id"):
+    app.logger.info(f'get_token request did not have a session_id')
+    return None
+
   params = {
     'session_id': request.cookies.get("session_id"),
     'origin': request.host_url,
@@ -157,33 +187,19 @@ def get_token(request, token_type='access'):
 def login():
   app.logger.info(f'/session:')
   session_id = uuid.uuid4().hex
-  state = b64encode(json.dumps({'return_to': LOGIN_LANDING_URI, 'session_id':session_id, 'public_pem':public_pem}).encode()).decode()
+  state = b64encode(json.dumps({'return_to': login_landing_uri(request), 'session_id':session_id, 'public_pem':public_pem}).encode()).decode()
   response = redirect(f'{AUTH_SERVICE_LOGIN_ENDPOINT}?state={state}')
   app.logger.info(f'  END /session')
-  response.set_cookie("session_id", value=session_id, secure=True, httponly=True, domain='user-service.localhost')
+  response.set_cookie("session_id", value=session_id, secure=True, httponly=True, domain=user_service_domain(request))
   return response
-
-
-@app.route('/foo', methods=['GET'])
-def foo():
-  return Response(status=200, response=f'{request.host_url}')
 
 
 @app.route('/logout', methods=['GET'])
 def logout():
   app.logger.info(f'/logout:')
-  response = redirect(LOGIN_URI)
-  response.delete_cookie('session_id', domain='user-service.localhost')
+  response = redirect(login_landing_uri(request))
+  response.delete_cookie('session_id', domain=user_service_domain(request))
   app.logger.info(f'  END /logout')
-  return response
-
-
-@app.after_request
-def after_request(response):
-  if not PROD:
-    pass
-    # response.headers.add('Access-Control-Allow-Origin', 'http://localhost:3000')
-    # response.headers.add('Access-Control-Allow-Credentials', 'true')
   return response
   
 
