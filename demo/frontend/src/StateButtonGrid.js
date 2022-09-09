@@ -12,13 +12,13 @@ const Item = styled(Paper)(({ theme }) => ({
   color: theme.palette.text.secondary,
 }));
 
-function getControlElem(title, state, timeout, blocked_by_timeout, queryEndpoint, toggleEndpoint, blocked_by, liveMode) { 
+function getControlElem(title, state, timeout, blocked_by_timeout, queryEndpoint, toggleEndpoint, blocked_by, liveMode, allStates, pageMapper, pageNumber) { 
 
   var statusElem
   var toggleStatusElem
   if (liveMode) {
     statusElem = <QueryPollStatus state={state} endpoint={queryEndpoint}  timeout={timeout*TIMER_SCALE} blocked_by={blocked_by} blocked_by_timeout={blocked_by_timeout*TIMER_SCALE}/>
-    toggleStatusElem = <ExecuteToggleStatus state={state} endpoint={toggleEndpoint} timeout={timeout*TIMER_SCALE} blocked_by={blocked_by} blocked_by_timeout={blocked_by_timeout*TIMER_SCALE}/>
+    toggleStatusElem = <ExecuteToggleStatus state={state} endpoint={toggleEndpoint} timeout={timeout*TIMER_SCALE} blocked_by={blocked_by} blocked_by_timeout={blocked_by_timeout*TIMER_SCALE} allStates={allStates} pageMapper={pageMapper} pageNumber={pageNumber}/>
   } else {
     statusElem = <StatusTutorialMode state={state}/>
     toggleStatusElem = <ToggleStatusTutorialMode state={state}/>
@@ -43,7 +43,10 @@ function StateChangeButtonGrid(props){
   let cloudfunctionsRestrictedState = props.dataModel.allStates.cloudfunctionsRestrictedState
   let dialogflowRestrictedState = props.dataModel.allStates.dialogflowRestrictedState
   let serviceDirectoryWebhookState = props.dataModel.allStates.serviceDirectoryWebhookState
-  const liveMode = false
+  let allStates = props.dataModel.allStates
+  let pageMapper = props.dataModel.pageMapper
+  let pageNumber = props.dataModel.pageNumber
+  let liveMode = props.liveMode
 
   return (
   <Box sx={{ width: "75%", mx: "auto"}}>
@@ -52,31 +55,31 @@ function StateChangeButtonGrid(props){
         webhookAccessState, 3, 110,
         "/webhook_access_allow_unauthenticated_status", 
         "/update_webhook_access", 
-        cloudfunctionsRestrictedState, liveMode)}
+        cloudfunctionsRestrictedState, liveMode, allStates, pageMapper, pageNumber)}
 
       {getControlElem("Webhook Allow Internal Ingress Only?",
         webhookIngressState, 85, 110,
         "/webhook_ingress_internal_only_status", 
         "/update_webhook_ingress", 
-        cloudfunctionsRestrictedState, liveMode)}
+        cloudfunctionsRestrictedState, liveMode, allStates, pageMapper, pageNumber)}
 
       {getControlElem("Restrict Cloudfunctions Access to VPC?",
         cloudfunctionsRestrictedState, 15, null,
         "/restricted_services_status_cloudfunctions", 
         "/update_security_perimeter_cloudfunctions", 
-        null, liveMode)}
+        null, liveMode, allStates, pageMapper, pageNumber)}
 
       {getControlElem("Restrict Dialogflow Access to VPC?",
         dialogflowRestrictedState, 15, null,
         "/restricted_services_status_dialogflow", 
         "/update_security_perimeter_dialogflow", 
-        null, liveMode)}
+        null, liveMode, allStates, pageMapper, pageNumber)}
 
       {getControlElem("Route Dialogflow Through VPC Proxy?",
         serviceDirectoryWebhookState, 8, 110,
         "/service_directory_webhook_fulfillment_status", 
         "/update_service_directory_webhook_fulfillment", 
-        dialogflowRestrictedState, liveMode)}
+        dialogflowRestrictedState, liveMode, allStates, pageMapper, pageNumber)}
     </Grid>
   </Box>
 )}

@@ -73,6 +73,7 @@ function DataModel () {
   const projectInfo = {current: null, set: null};
   const pageNumber = {current: null, set: null};
   const renderedPageNumber = {current: null, set: null};
+  const activePage = {current: null, set: null};
 
   const allStates = {};
   allStates["dialogflowRestrictedState"] = getState();
@@ -90,12 +91,14 @@ function DataModel () {
   [projectInfo.current, projectInfo.set] = useState({});
   [pageNumber.current, pageNumber.set] = useState(33);
   [renderedPageNumber.current, renderedPageNumber.set] = useState(null);
+  [activePage.current, activePage.set] = useState(0);
 
   const dataModel = {
     pageMapper: pageMapper,
-    loggedIn:loggedIn,
-    projectInfo:projectInfo,
-    pageNumber:pageNumber,
+    loggedIn: loggedIn,
+    projectInfo: projectInfo,
+    pageNumber: pageNumber,
+    activePage: activePage,
     allStates: allStates,
     renderedPageNumber:renderedPageNumber,
   }

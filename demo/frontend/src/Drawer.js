@@ -18,8 +18,13 @@ import ListItemIcon from '@mui/material/ListItemIcon';
 import ListItemText from '@mui/material/ListItemText';
 import InboxIcon from '@mui/icons-material/MoveToInbox';
 import MailIcon from '@mui/icons-material/Mail';
+import Home from '@mui/icons-material/Home';
+import Publish from '@mui/icons-material/Publish';
+import School from '@mui/icons-material/School';
 import Login from '@mui/icons-material/Login';
 import Logout from '@mui/icons-material/Logout';
+import Slideshow from '@mui/icons-material/Slideshow';
+import Stream from '@mui/icons-material/Stream';
 import {useEffect} from "react";
 import {StateChangeButtonGrid} from './StateButtonGrid.js'
 import {StateImage} from './StateSlides.js'
@@ -97,7 +102,7 @@ function DrawerButton(props) {
   
   const Icon = props.icon
   return (
-    <ListItem key={props.text} disablePadding sx={{ display: 'block' }}>
+    <ListItem key={props.text} disablePadding sx={{ display: 'block' }} selected={props.dataModel.activePage.current === props.pageNumber}>
       <ListItemButton
         sx={{
           minHeight: 48,
@@ -144,14 +149,41 @@ function MiniDrawer(props) {
     props.dataModel.loggedIn.set(is_logged_in)
   });
 
+  function resetStateOnPageChange(dataModel) {
+    for (const [key, state] of Object.entries(dataModel.allStates)) {
+      state.status.set(false)
+      state.isUpdating.set(false)
+      state.blocked.set(false)
+    }
+  }
 
 
-  let loginButton = <DrawerButton open={open} text={"Login"} icon={Login} href={`http://${window.location.host}/session`}/>
-  let logoutButton = <DrawerButton open={open} text={"Logout"} icon={Logout} href={`http://${window.location.host}/logout`}/>
+
+  let loginButton = <DrawerButton open={open} text={"Login"} icon={Login} href={`http://${window.location.host}/session`} dataModel={props.dataModel} pageNumber={null}/>
+  let logoutButton = <DrawerButton open={open} text={"Logout"} icon={Logout} href={`http://${window.location.host}/logout`} dataModel={props.dataModel} pageNumber={null}/>
   let sessionButton = props.dataModel.loggedIn.current ? logoutButton : loginButton
   
   let StateImageCurr = <StateImage dataModel={props.dataModel}/>
-  let StateChangeButtonGridCurr = <StateChangeButtonGrid dataModel={props.dataModel}/>
+  
+  let HomeButton = <DrawerButton open={open} text={"Home"} icon={Home} dataModel={props.dataModel} pageNumber={0} onClick={() => {props.dataModel.activePage.set(0)}}/>
+  let TutorialButton = <DrawerButton open={open} text={"Tutorial"} icon={School} dataModel={props.dataModel} pageNumber={1} onClick={() => {
+    props.dataModel.activePage.set(1); 
+    resetStateOnPageChange(props.dataModel)
+  }}/>
+  let DeployInstructionsButton = <DrawerButton open={open} text={"Launch Demo"} icon={Publish} dataModel={props.dataModel} pageNumber={2} onClick={() => {props.dataModel.activePage.set(2)}}/>
+  let LiveDemoButton = <DrawerButton open={open} text={"Live Demo"} icon={Stream} dataModel={props.dataModel} pageNumber={3} onClick={() => {
+    props.dataModel.activePage.set(3);
+    resetStateOnPageChange(props.dataModel)
+  }}/>
+  
+  var StateChangeButtonGridCurr
+  if (props.dataModel.activePage.current === 1) {
+    StateChangeButtonGridCurr = <StateChangeButtonGrid dataModel={props.dataModel} liveMode={false}/>
+  } else if (props.dataModel.activePage.current === 3) {
+    StateChangeButtonGridCurr = <StateChangeButtonGrid dataModel={props.dataModel} liveMode={true}/>
+  } else {
+    StateChangeButtonGridCurr = <></>
+  }
 
   return (
     <Box sx={{ display: 'flex' }}>
@@ -183,11 +215,15 @@ function MiniDrawer(props) {
         </DrawerHeader>
         <Divider />
         <List>
+          {HomeButton}
           {sessionButton}
         </List>
         <Divider />
         <List>
-          {['All mail', 'Trash', 'Spam'].map((text, index) => (
+          {TutorialButton}
+          {DeployInstructionsButton}
+          {LiveDemoButton}
+          {/* {['All mail', 'Trash', 'Spam'].map((text, index) => (
             <ListItem key={text} disablePadding sx={{ display: 'block' }}>
               <ListItemButton
                 sx={{
@@ -208,7 +244,7 @@ function MiniDrawer(props) {
                 <ListItemText primary={text} sx={{ opacity: open ? 1 : 0 }} />
               </ListItemButton>
             </ListItem>
-          ))}
+          ))} */}
         </List>
       </Drawer>
       <Box component="main" sx={{ flexGrow: 1, p: 3 }}>
