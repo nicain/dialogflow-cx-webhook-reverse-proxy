@@ -65,7 +65,7 @@ curl -s -X POST \
   }' \
   "https://${REGION?}-dialogflow.googleapis.com/v3/projects/${PROJECT_ID?}/locations/${REGION?}/agents"
 
-AGENT_NAME=$(curl -s -X GET -H "Authorization: Bearer $(gcloud auth print-access-token)" \
+AGENT_FULL_NAME=$(curl -s -X GET -H "Authorization: Bearer $(gcloud auth print-access-token)" \
   -H "Content-Type:application/json" \
   -H "x-goog-user-project: ${PROJECT_ID}" \
   "https://${REGION?}-dialogflow.googleapis.com/v3/projects/${PROJECT_ID?}/locations/${REGION?}/agents" | jq -r '.agents[0].name')
@@ -78,9 +78,14 @@ curl -s -X POST \
   '{
     "agentUri": "gs://gassets-api-ai/prebuilt_agents/cx-prebuilt-agents/exported_agent_Telecommunications.blob"
   }' \
-  "https://${REGION?}-dialogflow.googleapis.com/v3/${AGENT_NAME?}:restore"
+  "https://${REGION?}-dialogflow.googleapis.com/v3/${AGENT_FULL_NAME?}:restore"
 
-curl -s -X PATCH\
+WEBHOOK_FULL_NAME=$(curl -s -X GET \
+  -H "Authorization: Bearer $(gcloud auth print-access-token)" \
+  -H "x-goog-user-project: ${PROJECT_ID?}" \
+  "https://${REGION?}-dialogflow.googleapis.com/v3/${AGENT_FULL_NAME?}/webhooks" | jq -r '.webhooks[0].name')
+
+curl -s -X PATCH \
   -H "Authorization: Bearer $(gcloud auth print-access-token)" \
   -H "Content-Type:application/json" \
   -H "x-goog-user-project: ${PROJECT_ID?}" \
@@ -89,4 +94,4 @@ curl -s -X PATCH\
     \"displayName\": \"cxPrebuiltAgentsTelecom\",
     \"genericWebService\": {\"uri\": \"${WEBHOOK_TRIGGER_URI?}\"}
   }" \
-  "https://${REGION?}-dialogflow.googleapis.com/v3/${WEBHOOK_NAME?}"
+  "https://${REGION?}-dialogflow.googleapis.com/v3/${WEBHOOK_FULL_NAME?}"
