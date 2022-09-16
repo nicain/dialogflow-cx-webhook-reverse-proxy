@@ -100,6 +100,8 @@ resource "google_service_directory_service" "reverse_proxy" {
 
 resource "google_compute_network" "vpc_network" {
   name = var.vpc_network
+  project = var.project_id
+  auto_create_subnetworks = false
 }
 
 resource "google_service_directory_endpoint" "reverse_proxy" {
