@@ -29,28 +29,12 @@ import {MiniDrawer} from './Drawer'
 import {DataModel, getPage} from "./DataModel.js";
 
 
-// function DebugPrintData(props) {
-//   const content = JSON.stringify(props.data, null, 2)
-//   function onClick() {
-//     return navigator.clipboard.writeText(content)
-//   }
-//   return(
-//   <div>
-//     <pre>
-//       <Button sx={{ textAlign: 'left' }} onClick={onClick} variant="contained" color="primary" >{content}</Button> 
-//     </pre>
-//   </div>
-  
-// )}
-
 export default function App() {
   const dataModel = DataModel();
   return (
     <BrowserRouter>
       <Routes>
-          {/* <Route path="/" element={<Home />} /> */}
           <Route path="/" element={<MiniDrawer dataModel={dataModel}/>} />
-          <Route path="/login" element={<Login />} />
        </Routes>
     </BrowserRouter>
   );
@@ -91,42 +75,42 @@ function getControlElem(title, state, timeout, blocked_by_timeout, queryEndpoint
 )}
 
 
-function StateChangeButtonGrid(props){  
-  return (
-  <Box sx={{ width: "75%", mx: "auto"}}>
-    <Grid container direction='column' rowSpacing={1}>
-      {getControlElem("Webhook Access Authenticated Only?",
-        props.webhookAccessState, 3, 110,
-        "/webhook_access_allow_unauthenticated_status", 
-        "/update_webhook_access", 
-        props.cloudfunctionsRestrictedState, props.liveMode)}
+// function StateChangeButtonGrid(props){  
+//   return (
+//   <Box sx={{ width: "75%", mx: "auto"}}>
+//     <Grid container direction='column' rowSpacing={1}>
+//       {getControlElem("Webhook Access Authenticated Only?",
+//         props.webhookAccessState, 3, 110,
+//         "/webhook_access_allow_unauthenticated_status", 
+//         "/update_webhook_access", 
+//         props.cloudfunctionsRestrictedState, props.liveMode)}
 
-      {getControlElem("Webhook Allow Internal Ingress Only?",
-        props.webhookIngressState, 85, 110,
-        "/webhook_ingress_internal_only_status", 
-        "/update_webhook_ingress", 
-        props.cloudfunctionsRestrictedState, props.liveMode)}
+//       {getControlElem("Webhook Allow Internal Ingress Only?",
+//         props.webhookIngressState, 85, 110,
+//         "/webhook_ingress_internal_only_status", 
+//         "/update_webhook_ingress", 
+//         props.cloudfunctionsRestrictedState, props.liveMode)}
 
-      {getControlElem("Restrict Cloudfunctions Access to VPC?",
-        props.cloudfunctionsRestrictedState, 15, null,
-        "/restricted_services_status_cloudfunctions", 
-        "/update_security_perimeter_cloudfunctions", 
-        null, props.liveMode)}
+//       {getControlElem("Restrict Cloudfunctions Access to VPC?",
+//         props.cloudfunctionsRestrictedState, 15, null,
+//         "/restricted_services_status_cloudfunctions", 
+//         "/update_security_perimeter_cloudfunctions", 
+//         null, props.liveMode)}
 
-      {getControlElem("Restrict Dialogflow Access to VPC?",
-        props.dialogflowRestrictedState, 15, null,
-        "/restricted_services_status_dialogflow", 
-        "/update_security_perimeter_dialogflow", 
-        null, props.liveMode)}
+//       {getControlElem("Restrict Dialogflow Access to VPC?",
+//         props.dialogflowRestrictedState, 15, null,
+//         "/restricted_services_status_dialogflow", 
+//         "/update_security_perimeter_dialogflow", 
+//         null, props.liveMode)}
 
-      {getControlElem("Route Dialogflow Through VPC Proxy?",
-        props.serviceDirectoryWebhookState, 8, 110,
-        "/service_directory_webhook_fulfillment_status", 
-        "/update_service_directory_webhook_fulfillment", 
-        props.dialogflowRestrictedState, props.liveMode)}
-    </Grid>
-  </Box>
-)}
+//       {getControlElem("Route Dialogflow Through VPC Proxy?",
+//         props.serviceDirectoryWebhookState, 8, 110,
+//         "/service_directory_webhook_fulfillment_status", 
+//         "/update_service_directory_webhook_fulfillment", 
+//         props.dialogflowRestrictedState, props.liveMode)}
+//     </Grid>
+//   </Box>
+// )}
 
 
 function NewInitState(name, allStates) {
@@ -301,14 +285,14 @@ function Home() {
       {<InfoBanner projectInfo={projectInfo} liveMode={liveMode}/>}
       {/* {<DebugPrintData data={allStatesToPageInfo(allStates)}/>} */}
       {<StateImages curr_page={curr_page} isLoading={isLoading} renderedPageNumber={renderedPageNumber} setRenderedPageNumber={setRenderedPageNumber}/>}
-      {<StateChangeButtonGrid 
+      {/* {<StateChangeButtonGrid 
         dialogflowRestrictedState={dialogflowRestrictedState}
         cloudfunctionsRestrictedState={cloudfunctionsRestrictedState}
         webhookAccessState={webhookAccessState}
         webhookIngressState={webhookIngressState}
         serviceDirectoryWebhookState={serviceDirectoryWebhookState}
         liveMode={liveMode}
-      />}
+      />} */}
       {<QueryInfo setProjectInfo={setProjectInfo}/>}
     </div>
   );
@@ -319,10 +303,9 @@ function Login() {
     <div>
       <h2>Home</h2>
       {<LoginButton />}
-      {<StateImages curr_page={33}/>}
     </div>
   );
-      }
+}
 
 function LiveMode(props) {
 
@@ -346,7 +329,6 @@ function LiveMode(props) {
       }
     } else if (previousLiveModeState === false) {
       timeSinceLiveModeEnabled.current = 0
-      console.log(props.projectInfo)
     }
   }
   return (
@@ -456,7 +438,6 @@ function LoginButton() {
 //     return "error encountered"
 //   }
 
-//   console.log(data)
 
 //   return (
 //     <div>

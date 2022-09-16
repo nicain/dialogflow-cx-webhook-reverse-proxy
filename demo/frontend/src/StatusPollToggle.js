@@ -7,6 +7,7 @@ import {
   Navigate,
 } from "react-router-dom";
 import {getPage} from './DataModel.js';
+import Tooltip from '@mui/material/Tooltip';
 
 const TIMER_SCALE = 10;
 
@@ -18,7 +19,11 @@ function ToggleStatus(props) {
   const {isFetching, refetch} = useQuery(props.endpoint, 
   () =>
   axios
-    .post(props.endpoint, {"status": !props.state.status.current})
+    .post(props.endpoint, {status: !props.state.status.current}, {params: {
+      project_id: props.dataModel.projectData.project_id.current,
+      region: props.dataModel.projectData.region.current,
+      webhook_name: props.dataModel.projectData.webhook_name.current,
+    }})
     .then((res) => res.data),  {
       enabled:false, 
   })
@@ -32,7 +37,7 @@ function ToggleStatus(props) {
   
   useEffect(() => {
     if (updatePageNumber.current) {
-      const newPageNumber = getPage(props.allStates, props.pageMapper)
+      const newPageNumber = getPage(props.dataModel.allStates, props.pageMapper)
       props.pageNumber.set(newPageNumber)
       updatePageNumber.current = false
     }
@@ -84,7 +89,7 @@ function ExecuteToggleStatus(props) {
           timeout={props.timeout} 
           blocked_by={props.blocked_by} 
           blocked_by_timeout={props.blocked_by_timeout}
-          allStates={props.allStates}
+          dataModel={props.dataModel}
           pageMapper={props.pageMapper}
           pageNumber={props.pageNumber}
         />
@@ -101,7 +106,11 @@ function PollStatus(props) {
   }
   function queryFunction () {
     return axios
-    .get(props.endpoint)
+    .get(props.endpoint, {params:{
+      project_id: props.dataModel.projectData.project_id.current,
+      region: props.dataModel.projectData.region.current,
+      webhook_name: props.dataModel.projectData.webhook_name.current,
+    }})
     .then((res) => res.data)
   }
 
@@ -127,10 +136,6 @@ function PollStatus(props) {
     }
   })
 
-  if (isError && error.response.data === 'NO_TOKEN') {
-    return (<Navigate to="/login" />)
-  }
-
   if (props.state.isUpdating.current) {
     var remainingTimeBlocker = 0
     if (props.blocked_by) {
@@ -150,7 +155,11 @@ function PollStatus(props) {
     }
     return <CircularProgress size={20}/>;
   } else if (props.state.blocked.current) {
-    return (<div style={{ color: 'red' }}>{"Blocked"}</div>);
+    return (
+      <Tooltip title={`Reason: ${data.reason}`} arrow placement="top">
+        <div style={{ color: 'red' }}>{"Blocked"}</div>
+      </Tooltip>
+    );
   } else {
     return (<div>{(props.state.status.current) ? "True" : "False"}</div>);
   }
@@ -161,7 +170,13 @@ function QueryPollStatus(props) {
   return (
     <div>
       <QueryClientProvider  client={queryClient}>
-        <PollStatus state={props.state} endpoint={props.endpoint} timeout={props.timeout} blocked_by={props.blocked_by} blocked_by_timeout={props.blocked_by_timeout}/>
+        <PollStatus 
+          state={props.state} 
+          endpoint={props.endpoint} 
+          timeout={props.timeout} 
+          blocked_by={props.blocked_by} 
+          blocked_by_timeout={props.blocked_by_timeout}
+          dataModel={props.dataModel}/>
       </QueryClientProvider>
     </div>
   )

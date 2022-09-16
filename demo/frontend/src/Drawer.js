@@ -18,6 +18,7 @@ import ListItemIcon from '@mui/material/ListItemIcon';
 import ListItemText from '@mui/material/ListItemText';
 import InboxIcon from '@mui/icons-material/MoveToInbox';
 import MailIcon from '@mui/icons-material/Mail';
+import Settings from '@mui/icons-material/Settings';
 import Home from '@mui/icons-material/Home';
 import Publish from '@mui/icons-material/Publish';
 import School from '@mui/icons-material/School';
@@ -28,6 +29,10 @@ import Stream from '@mui/icons-material/Stream';
 import {useEffect} from "react";
 import {StateChangeButtonGrid} from './StateButtonGrid.js'
 import {StateImage} from './StateSlides.js'
+// import {LiveProjectInfo} from './LiveProjectInfo.js'
+import {QueryInfo} from './Info.js'
+import Tooltip from '@mui/material/Tooltip';
+import {SettingsPanel} from './SettingsPanel.js';
 
 const drawerWidth = 240;
 const TITLE = 'VPC-SC Live Demo'
@@ -102,28 +107,30 @@ function DrawerButton(props) {
   
   const Icon = props.icon
   return (
-    <ListItem key={props.text} disablePadding sx={{ display: 'block' }} selected={props.dataModel.activePage.current === props.pageNumber}>
-      <ListItemButton
-        sx={{
-          minHeight: 48,
-          justifyContent: props.open ? 'initial' : 'center',
-          px: 2.5,
-        }}
-        href={props.href}
-        onClick={props.onClick}
-      >
-        <ListItemIcon
+    <Tooltip title={props.open ? "" : props.text} disableInteractive arrow placement="top">
+      <ListItem key={props.text} disablePadding sx={{ display: 'block' }} selected={props.dataModel.activePage.current === props.pageNumber}>
+        <ListItemButton
           sx={{
-            minWidth: 0,
-            mr: props.open ? 3 : 'auto',
-            justifyContent: 'center',
+            minHeight: 48,
+            justifyContent: props.open ? 'initial' : 'center',
+            px: 2.5,
           }}
+          href={props.href}
+          onClick={props.onClick}
         >
-        <Icon />
-        </ListItemIcon>
-        <ListItemText primary={props.text} sx={{ opacity: props.open ? 1 : 0 }} />
-      </ListItemButton>
-    </ListItem>
+          <ListItemIcon
+            sx={{
+              minWidth: 0,
+              mr: props.open ? 3 : 'auto',
+              justifyContent: 'center',
+            }}
+          >
+          <Icon />
+          </ListItemIcon>
+          <ListItemText primary={props.text} sx={{ opacity: props.open ? 1 : 0 }} />
+        </ListItemButton>
+      </ListItem>
+    </Tooltip>
 )}
 
 function getCookie(name) {
@@ -133,6 +140,7 @@ function getCookie(name) {
 }
 
 function MiniDrawer(props) {
+
   const theme = useTheme();
   const [open, setOpen] = React.useState(false);
 
@@ -157,14 +165,9 @@ function MiniDrawer(props) {
     }
   }
 
-
-
   let loginButton = <DrawerButton open={open} text={"Login"} icon={Login} href={`http://${window.location.host}/session`} dataModel={props.dataModel} pageNumber={null}/>
   let logoutButton = <DrawerButton open={open} text={"Logout"} icon={Logout} href={`http://${window.location.host}/logout`} dataModel={props.dataModel} pageNumber={null}/>
-  let sessionButton = props.dataModel.loggedIn.current ? logoutButton : loginButton
-  
-  let StateImageCurr = <StateImage dataModel={props.dataModel}/>
-  
+    
   let HomeButton = <DrawerButton open={open} text={"Home"} icon={Home} dataModel={props.dataModel} pageNumber={0} onClick={() => {props.dataModel.activePage.set(0)}}/>
   let TutorialButton = <DrawerButton open={open} text={"Tutorial"} icon={School} dataModel={props.dataModel} pageNumber={1} onClick={() => {
     props.dataModel.activePage.set(1); 
@@ -175,98 +178,91 @@ function MiniDrawer(props) {
     props.dataModel.activePage.set(3);
     resetStateOnPageChange(props.dataModel)
   }}/>
+  let SettingsButton = <DrawerButton open={open} text={"Settings"} icon={Settings} dataModel={props.dataModel} pageNumber={4} onClick={() => {
+    props.dataModel.activePage.set(4);
+  }}/>
   
   var StateChangeButtonGridCurr
+  // var LiveProjectInfoCurr
+  var StateImageCurr
+  var SettingsCurr
   if (props.dataModel.activePage.current === 1) {
+    StateImageCurr = <StateImage dataModel={props.dataModel}/>
     StateChangeButtonGridCurr = <StateChangeButtonGrid dataModel={props.dataModel} liveMode={false}/>
   } else if (props.dataModel.activePage.current === 3) {
+    StateImageCurr = <StateImage dataModel={props.dataModel}/>
     StateChangeButtonGridCurr = <StateChangeButtonGrid dataModel={props.dataModel} liveMode={true}/>
-  } else {
-    StateChangeButtonGridCurr = <></>
+    // LiveProjectInfoCurr = <LiveProjectInfo dataModel={props.dataModel}/>
+  } else if (props.dataModel.activePage.current === 4) {
+    SettingsCurr = <SettingsPanel dataModel={props.dataModel}/>
   }
 
   return (
-    <Box sx={{ display: 'flex' }}>
-      <CssBaseline />
-      <AppBar position="fixed" open={open}>
-        <Toolbar>
-          <IconButton
-            color="inherit"
-            aria-label="open drawer"
-            onClick={handleDrawerOpen}
-            edge="start"
-            sx={{
-              marginRight: 5,
-              ...(open && { display: 'none' }),
-            }}
-          >
-            <MenuIcon />
-          </IconButton>
-          <Typography variant="h6" noWrap component="div">
-            {TITLE}
+    <div>
+      <Box sx={{ display: 'flex' }}>
+        <CssBaseline />
+        <AppBar position="fixed" open={open}>
+          <Toolbar>
+            <IconButton
+              color="inherit"
+              aria-label="open drawer"
+              onClick={handleDrawerOpen}
+              edge="start"
+              sx={{
+                marginRight: 5,
+                ...(open && { display: 'none' }),
+              }}
+            >
+              <MenuIcon />
+            </IconButton>
+            <Typography variant="h6" noWrap component="div">
+              {TITLE}
+            </Typography>
+          </Toolbar>
+        </AppBar>
+        <Drawer variant="permanent" open={open}>
+          <DrawerHeader>
+            <IconButton onClick={handleDrawerClose}>
+              {theme.direction === 'rtl' ? <ChevronRightIcon /> : <ChevronLeftIcon />}
+            </IconButton>
+          </DrawerHeader>
+          <Divider />
+          <List>
+            {HomeButton}
+            {loginButton}
+            {props.dataModel.loggedIn.current ? logoutButton : <></>}
+          </List>
+          <Divider />
+          <List>
+            {TutorialButton}
+            {DeployInstructionsButton}
+            {LiveDemoButton}
+            {SettingsButton}
+          </List>
+        </Drawer>
+        <Box component="main" sx={{ flexGrow: 1, p: 3 }}>
+          <DrawerHeader />
+          <Typography paragraph>
+            Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod
+            tempor incididunt ut labore et dolore magna aliqua. Rhoncus dolor purus non
+            enim praesent elementum facilisis leo vel. Risus at ultrices mi tempus
+            imperdiet. Semper risus in hendrerit gravida rutrum quisque non tellus.
+            Convallis convallis tellus id interdum velit laoreet id donec ultrices.
+            Odio morbi quis commodo odio aenean sed adipiscing. Amet nisl suscipit
+            adipiscing bibendum est ultricies integer quis. Cursus euismod quis viverra
+            nibh cras. Metus vulputate eu scelerisque felis imperdiet proin fermentum
+            leo. Mauris commodo quis imperdiet massa tincidunt. Cras tincidunt lobortis
+            feugiat vivamus at augue. At augue eget arcu dictum varius duis at
+            consectetur lorem. Velit sed ullamcorper morbi tincidunt. Lorem donec massa
+            sapien faucibus et molestie ac.
           </Typography>
-        </Toolbar>
-      </AppBar>
-      <Drawer variant="permanent" open={open}>
-        <DrawerHeader>
-          <IconButton onClick={handleDrawerClose}>
-            {theme.direction === 'rtl' ? <ChevronRightIcon /> : <ChevronLeftIcon />}
-          </IconButton>
-        </DrawerHeader>
-        <Divider />
-        <List>
-          {HomeButton}
-          {sessionButton}
-        </List>
-        <Divider />
-        <List>
-          {TutorialButton}
-          {DeployInstructionsButton}
-          {LiveDemoButton}
-          {/* {['All mail', 'Trash', 'Spam'].map((text, index) => (
-            <ListItem key={text} disablePadding sx={{ display: 'block' }}>
-              <ListItemButton
-                sx={{
-                  minHeight: 48,
-                  justifyContent: open ? 'initial' : 'center',
-                  px: 2.5,
-                }}
-              >
-                <ListItemIcon
-                  sx={{
-                    minWidth: 0,
-                    mr: open ? 3 : 'auto',
-                    justifyContent: 'center',
-                  }}
-                >
-                  {index % 2 === 0 ? <InboxIcon /> : <MailIcon />}
-                </ListItemIcon>
-                <ListItemText primary={text} sx={{ opacity: open ? 1 : 0 }} />
-              </ListItemButton>
-            </ListItem>
-          ))} */}
-        </List>
-      </Drawer>
-      <Box component="main" sx={{ flexGrow: 1, p: 3 }}>
-        <DrawerHeader />
-        <Typography paragraph>
-          Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod
-          tempor incididunt ut labore et dolore magna aliqua. Rhoncus dolor purus non
-          enim praesent elementum facilisis leo vel. Risus at ultrices mi tempus
-          imperdiet. Semper risus in hendrerit gravida rutrum quisque non tellus.
-          Convallis convallis tellus id interdum velit laoreet id donec ultrices.
-          Odio morbi quis commodo odio aenean sed adipiscing. Amet nisl suscipit
-          adipiscing bibendum est ultricies integer quis. Cursus euismod quis viverra
-          nibh cras. Metus vulputate eu scelerisque felis imperdiet proin fermentum
-          leo. Mauris commodo quis imperdiet massa tincidunt. Cras tincidunt lobortis
-          feugiat vivamus at augue. At augue eget arcu dictum varius duis at
-          consectetur lorem. Velit sed ullamcorper morbi tincidunt. Lorem donec massa
-          sapien faucibus et molestie ac.
-        </Typography>
-        {StateImageCurr}
-        {StateChangeButtonGridCurr}
+          {StateImageCurr}
+          {StateChangeButtonGridCurr}
+          {/* {LiveProjectInfoCurr} */}
+          {SettingsCurr}
+        </Box>
       </Box>
-    </Box>
+    </div>
   );
 }
 

@@ -18,10 +18,15 @@ function Info(props) {
     }
   );
 
-  useEffect(() => {
-    props.setProjectInfo(data)
-  })
+  // console.log(props.dataModel.projectData, props.dataModel.projectData.project_id.current.project_id)
 
+  // console.log(props.dataModel.projectData.project_id, data)
+  useEffect(() => {
+    if (data) {
+      props.dataModel.projectData.project_id.set(data.project_id)
+    }
+    // props.setProjectInfo(data)
+  }) 
 }
 
 function QueryInfo(props) {
@@ -29,7 +34,7 @@ function QueryInfo(props) {
   return (
     <div>
       <QueryClientProvider  client={queryClient}>
-        <Info endpoint="/info" setProjectInfo={props.setProjectInfo}/>
+        <Info endpoint="/info" dataModel={props.dataModel}/>
       </QueryClientProvider>
     </div>
   )

@@ -9,6 +9,10 @@ RUN apk add --update nodejs npm
 ARG PROD
 ENV PROD=${PROD:-true}
 
+RUN wget https://releases.hashicorp.com/terraform/1.2.9/terraform_1.2.9_linux_amd64.zip
+RUN unzip terraform_1.2.9_linux_amd64.zip
+RUN mv terraform /usr/bin/terraform
+
 # Frontend
 WORKDIR /app/frontend
 

@@ -1,0 +1,8 @@
+FROM vpc-sc-demo:latest
+
+RUN apk add openrc
+RUN apk add nginx
+COPY nginx.conf /etc/nginx/nginx.conf
+RUN nginx
+
+CMD /bin/bash

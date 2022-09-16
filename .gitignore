@@ -6,3 +6,9 @@ public_key.pem
 principal.env
 templates
 launch
+
+.terraform.lock.hcl
+.terraform/
+plan.out
+terraform.tfstate
+terraform.tfstate.backup

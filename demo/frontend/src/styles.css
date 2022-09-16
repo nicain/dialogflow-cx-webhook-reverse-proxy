@@ -56,3 +56,18 @@ button:hover {
   position: absolute !important;
   z-index: 1;
 }
+
+.settingExternalLink {
+  color: #1976d2;
+  text-decoration-color: #1976d2;
+}
+
+.settingExternalLink:hover {
+  -webkit-text-fill-color: #1976d2 !important;
+  cursor: pointer;
+}
+
+/* .MuiTextField-root {
+  border-color: green !important;
+} */
+

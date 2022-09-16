@@ -1,6 +1,10 @@
 import {useState} from "react";
 import {TIMER_SCALE} from "./StatusPollToggle.js"
 
+const project_id_default = "vpc-sc-demo-nicholascain14";
+const webhook_name_default = "custom-telco-webhook";
+const region_default = "us-central1";
+
 class ReversibleMap {
   constructor(map) {
      this.map = map;
@@ -67,10 +71,27 @@ function InitializeState(state) {
   [state.timeSinceSliderClick.current, state.timeSinceSliderClick.set] = useState(1000*TIMER_SCALE);
 }
 
+function ProjectData () {
+  const project_id = {current: null, set: null};
+  const principal = {current: null, set: null};
+  const webhook_name = {current: null, set: null};
+  const region = {current: null, set: null};
+  [project_id.current, project_id.set] = useState(project_id_default);
+  [webhook_name.current, webhook_name.set] = useState(webhook_name_default);
+  [region.current, region.set] = useState(region_default);
+  [principal.current, principal.set] = useState(null);
+
+  return {
+    project_id: project_id,
+    webhook_name: webhook_name,
+    region: region,
+    principal: principal,
+  }
+}
+
 function DataModel () {
   const pageMapper = BuildMapPageNumberToState();
   const loggedIn = {current: null, set: null};
-  const projectInfo = {current: null, set: null};
   const pageNumber = {current: null, set: null};
   const renderedPageNumber = {current: null, set: null};
   const activePage = {current: null, set: null};
@@ -88,7 +109,6 @@ function DataModel () {
   InitializeState(allStates["serviceDirectoryWebhookState"]);
 
   [loggedIn.current, loggedIn.set] = useState(false);
-  [projectInfo.current, projectInfo.set] = useState({});
   [pageNumber.current, pageNumber.set] = useState(33);
   [renderedPageNumber.current, renderedPageNumber.set] = useState(null);
   [activePage.current, activePage.set] = useState(0);
@@ -96,11 +116,11 @@ function DataModel () {
   const dataModel = {
     pageMapper: pageMapper,
     loggedIn: loggedIn,
-    projectInfo: projectInfo,
     pageNumber: pageNumber,
     activePage: activePage,
     allStates: allStates,
-    renderedPageNumber:renderedPageNumber,
+    renderedPageNumber: renderedPageNumber,
+    projectData: ProjectData(),
   }
   return dataModel
 }
@@ -119,4 +139,4 @@ function getPage(allStates, pageMapper) {
   return pageMapper.map.get(pageMapper.stateCache)
 }
 
-export {DataModel, getPage}
+export {DataModel, getPage, webhook_name_default}
