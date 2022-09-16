@@ -90,6 +90,7 @@ resource "google_service_directory_namespace" "reverse_proxy" {
   provider     = google-beta
   namespace_id = var.service_directory_namespace
   location     = var.region
+  project = google_project.project.project_id
 }
 
 resource "google_service_directory_service" "reverse_proxy" {
