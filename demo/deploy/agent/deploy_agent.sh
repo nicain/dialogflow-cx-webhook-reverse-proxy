@@ -53,6 +53,7 @@ done
 
 WEBHOOK_TRIGGER_URI="https://${REGION?}-${PROJECT_ID?}.cloudfunctions.net/${WEBHOOK_NAME?}"
 
+echo 'Creating agent...'
 curl -s -X POST \
   -H "Authorization: Bearer $(gcloud auth print-access-token)" \
   -H "Content-Type:application/json" \
@@ -64,12 +65,16 @@ curl -s -X POST \
     "timeZone": "America/Chicago"
   }' \
   "https://${REGION?}-dialogflow.googleapis.com/v3/projects/${PROJECT_ID?}/locations/${REGION?}/agents"
+echo '  Done creating agent.'
 
+echo 'Getting agent name...'
 AGENT_FULL_NAME=$(curl -s -X GET -H "Authorization: Bearer $(gcloud auth print-access-token)" \
   -H "Content-Type:application/json" \
   -H "x-goog-user-project: ${PROJECT_ID}" \
   "https://${REGION?}-dialogflow.googleapis.com/v3/projects/${PROJECT_ID?}/locations/${REGION?}/agents" | jq -r '.agents[0].name')
+echo '  Done getting agent name.'
 
+echo 'Restoring agent...'
 curl -s -X POST \
   -H "Authorization: Bearer $(gcloud auth print-access-token)" \
   -H "Content-Type:application/json" \
@@ -79,12 +84,16 @@ curl -s -X POST \
     "agentUri": "gs://gassets-api-ai/prebuilt_agents/cx-prebuilt-agents/exported_agent_Telecommunications.blob"
   }' \
   "https://${REGION?}-dialogflow.googleapis.com/v3/${AGENT_FULL_NAME?}:restore"
+echo '  Done restoring agent.'
 
+echo 'Getting webhook name...'
 WEBHOOK_FULL_NAME=$(curl -s -X GET \
   -H "Authorization: Bearer $(gcloud auth print-access-token)" \
   -H "x-goog-user-project: ${PROJECT_ID?}" \
   "https://${REGION?}-dialogflow.googleapis.com/v3/${AGENT_FULL_NAME?}/webhooks" | jq -r '.webhooks[0].name')
+echo '  Done getting webhook name.'
 
+echo 'Setting webhook fulfillment to Cloud Function...'
 curl -s -X PATCH \
   -H "Authorization: Bearer $(gcloud auth print-access-token)" \
   -H "Content-Type:application/json" \
@@ -95,3 +104,4 @@ curl -s -X PATCH \
     \"genericWebService\": {\"uri\": \"${WEBHOOK_TRIGGER_URI?}\"}
   }" \
   "https://${REGION?}-dialogflow.googleapis.com/v3/${WEBHOOK_FULL_NAME?}"
+echo '  Done setting webhook fulfillment to Cloud Function.'
