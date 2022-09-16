@@ -71,9 +71,9 @@ terraform {
 
 resource "google_storage_bucket_object" "archive" {
   name   = "index.zip"
-  bucket = google_storage_bucket.bucket.name
+  bucket = var.bucket
   source = data.archive_file.source.output_path
-  depends_on = [data.archive_file.source, google_storage_bucket.bucket]
+  depends_on = [data.archive_file.source]
 }
 
 resource "google_cloudfunctions_function" "function" {
@@ -82,7 +82,7 @@ resource "google_cloudfunctions_function" "function" {
   description = "VPC-SC Demo Webhook"
   runtime     = "python39"
   available_memory_mb   = 128
-  source_archive_bucket = google_storage_bucket.bucket.name
+  source_archive_bucket = var.bucket
   source_archive_object = google_storage_bucket_object.archive.name
   trigger_http          = true
   timeout               = 60
