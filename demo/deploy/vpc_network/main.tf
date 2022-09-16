@@ -84,6 +84,7 @@ resource "google_compute_router_nat" "nat_manual" {
   source_subnetwork_ip_ranges_to_nat = "ALL_SUBNETWORKS_ALL_IP_RANGES"
   log_config {
     enable = true
+    filter = "ALL"
   }
 }
 
@@ -96,7 +97,7 @@ resource "google_compute_firewall" "allow_dialogflow" {
     protocol = "tcp"
     ports    = ["443"]
   }
-  source_ranges = "35.199.192.0/19"
+  source_ranges = ["35.199.192.0/19"]
   target_tags = ["webhook-reverse-proxy-vm"]
 }
 
