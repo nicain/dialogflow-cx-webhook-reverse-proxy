@@ -1,0 +1,7 @@
+service_directory_namespace="df-namespace"
+service_directory_service="df-service"
+service_directory_endpoint="df-endpoint"
+reverse_proxy_server_ip="10.10.20.2"
+vpc_network="webhook-net"
+project_id="vpc-sc-demo-nicholascain15"
+region="us-central1"
