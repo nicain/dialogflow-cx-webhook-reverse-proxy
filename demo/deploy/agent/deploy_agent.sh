@@ -84,6 +84,7 @@ curl -s -X POST \
     "agentUri": "gs://gassets-api-ai/prebuilt_agents/cx-prebuilt-agents/exported_agent_Telecommunications.blob"
   }' \
   "https://${REGION?}-dialogflow.googleapis.com/v3/${AGENT_FULL_NAME?}:restore"
+sleep 5
 echo '  Done restoring agent.'
 
 echo 'Getting webhook name...'
