@@ -663,6 +663,15 @@ def dev():
   # region = request.args['region']
   # webhook_name = request.args['webhook_name']
 
+  '''
+  terraform init && terraform apply --auto-approve \
+    -var access_token=$(gcloud auth print-access-token) \
+    -var project_id=${PROJECT_ID?} \
+    -var region=${REGION?} \
+    -var bucket=${PROJECT_ID?}-tf \
+    -var webhook_name=${WEBHOOK_NAME?} \
+  '''
+
   variables = {
     'project_id':project_id,
     'access_token':access_token,
