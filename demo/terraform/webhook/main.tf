@@ -57,12 +57,6 @@ data "archive_file" "source" {
   output_path = local.archive_path
 }
 
-resource "google_storage_bucket" "bucket" {
-  name     = var.bucket
-  location = "US"
-  project = var.project_id
-}
-
 provider "google" {
   project     = var.project_id
   region      = var.region
