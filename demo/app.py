@@ -663,91 +663,6 @@ def dev():
   # region = request.args['region']
   # webhook_name = request.args['webhook_name']
 
-  '''
-  terraform init && terraform apply --auto-approve \
-    -var access_token=$(gcloud auth print-access-token) \
-    -var project_id=${PROJECT_ID?} \
-    -var vpc_network=${VPC_NETWORK} \
-    -var vpc_subnetwork=${VPC_SUBNETWORK} \
-    -var reverse_proxy_server_ip=${REVERSE_PROXY_SERVER_IP} \
-    -var region=${REGION?}
-
-  terraform init && terraform apply --auto-approve \
-    -var service_directory_namespace=${SERVICE_DIRECTORY_NAMESPACE?} \
-    -var service_directory_service=${SERVICE_DIRECTORY_SERVICE?} \
-    -var service_directory_endpoint=${SERVICE_DIRECTORY_ENDPOINT?} \
-    -var reverse_proxy_server_ip=${REVERSE_PROXY_SERVER_IP} \
-    -var vpc_network=${VPC_NETWORK} \
-    -var project_id=${PROJECT_ID?} \
-    -var access_token=$(gcloud auth print-access-token) \
-    -var region=${REGION?}
-
-  terraform import \
-    -var service_directory_namespace=${SERVICE_DIRECTORY_NAMESPACE?} \
-    -var service_directory_service=${SERVICE_DIRECTORY_SERVICE?} \
-    -var service_directory_endpoint=${SERVICE_DIRECTORY_ENDPOINT?} \
-    -var reverse_proxy_server_ip=${REVERSE_PROXY_SERVER_IP} \
-    -var vpc_network=${VPC_NETWORK} \
-    -var project_id=${PROJECT_ID?} \
-    -var access_token=$(gcloud auth print-access-token) \
-    -var region=${REGION?} google_service_directory_namespace.reverse_proxy projects/vpc-sc-demo-nicholascain14/locations/us-central1/namespaces/df-namespace
-
-  terraform import \
-    -var service_directory_namespace=${SERVICE_DIRECTORY_NAMESPACE?} \
-    -var service_directory_service=${SERVICE_DIRECTORY_SERVICE?} \
-    -var service_directory_endpoint=${SERVICE_DIRECTORY_ENDPOINT?} \
-    -var reverse_proxy_server_ip=${REVERSE_PROXY_SERVER_IP} \
-    -var vpc_network=${VPC_NETWORK} \
-    -var project_id=${PROJECT_ID?} \
-    -var access_token=$(gcloud auth print-access-token) \
-    -var region=${REGION?} google_service_directory_service.reverse_proxy projects/vpc-sc-demo-nicholascain14/locations/us-central1/namespaces/df-namespace/services/df-service
-
-  terraform import \
-    -var service_directory_namespace=${SERVICE_DIRECTORY_NAMESPACE?} \
-    -var service_directory_service=${SERVICE_DIRECTORY_SERVICE?} \
-    -var service_directory_endpoint=${SERVICE_DIRECTORY_ENDPOINT?} \
-    -var reverse_proxy_server_ip=${REVERSE_PROXY_SERVER_IP} \
-    -var vpc_network=${VPC_NETWORK} \
-    -var project_id=${PROJECT_ID?} \
-    -var access_token=$(gcloud auth print-access-token) \
-    -var region=${REGION?} google_compute_network.vpc_network projects/vpc-sc-demo-nicholascain15/global/networks/webhook-net
-
-
-  terraform init && terraform apply --auto-approve \
-    -var access_token=$(gcloud auth print-access-token) \
-    -var project_id=${PROJECT_ID?} \
-    -var region=${REGION?} \
-    -var bucket=${PROJECT_ID?}-tf \
-    -var webhook_name=${WEBHOOK_NAME?} \
-
-  curl -s -X POST \
-    -H "Authorization: Bearer $(gcloud auth print-access-token)" \
-    -H "Content-Type:application/json" \
-    -H "x-goog-user-project: ${PROJECT_ID?}" \
-    -d \
-    '{
-      "displayName": "Telecommunications",
-      "defaultLanguageCode": "en",
-      "timeZone": "America/Chicago"
-    }' \
-    "https://${REGION?}-dialogflow.googleapis.com/v3/projects/${PROJECT_ID?}/locations/${REGION?}/agents"
-
-  export AGENT_NAME=$(curl -s -X GET -H "Authorization: Bearer $(gcloud auth print-access-token)" \
-    -H "Content-Type:application/json" \
-    -H "x-goog-user-project: ${PROJECT_ID}" \
-    "https://${REGION?}-dialogflow.googleapis.com/v3/projects/${PROJECT_ID?}/locations/${REGION?}/agents" | jq -r '.agents[0].name')
-
-  curl -s -X POST \
-    -H "Authorization: Bearer $(gcloud auth print-access-token)" \
-    -H "Content-Type:application/json" \
-    -H "x-goog-user-project: ${PROJECT_ID?}" \
-    -d \
-    '{
-     "agentUri": "gs://gassets-api-ai/prebuilt_agents/cx-prebuilt-agents/exported_agent_Telecommunications.blob"
-    }' \
-    "https://${REGION?}-dialogflow.googleapis.com/v3/${AGENT_NAME?}:restore"
-  '''
-
   variables = {
     'project_id':project_id,
     'access_token':access_token,
@@ -785,3 +700,91 @@ def dev():
   app.logger.info('Terraform plan deployed.')
   return Response(status=200, response='OK')
 # Error: Error acquiring the state lock
+
+
+  '''
+  terraform init && terraform apply --auto-approve \
+    -var access_token=$(gcloud auth print-access-token) \
+    -var project_id=${PROJECT_ID?} \
+    -var vpc_network=${VPC_NETWORK} \
+    -var vpc_subnetwork=${VPC_SUBNETWORK} \
+    -var reverse_proxy_server_ip=${REVERSE_PROXY_SERVER_IP} \
+    -var region=${REGION?}
+
+  terraform init && terraform apply --auto-approve \
+    -var service_directory_namespace=${SERVICE_DIRECTORY_NAMESPACE?} \
+    -var service_directory_service=${SERVICE_DIRECTORY_SERVICE?} \
+    -var service_directory_endpoint=${SERVICE_DIRECTORY_ENDPOINT?} \
+    -var reverse_proxy_server_ip=${REVERSE_PROXY_SERVER_IP} \
+    -var vpc_network=${VPC_NETWORK} \
+    -var project_id=${PROJECT_ID?} \
+    -var access_token=$(gcloud auth print-access-token) \
+    -var region=${REGION?}
+
+  terraform import \
+    -var service_directory_namespace=${SERVICE_DIRECTORY_NAMESPACE?} \
+    -var service_directory_service=${SERVICE_DIRECTORY_SERVICE?} \
+    -var service_directory_endpoint=${SERVICE_DIRECTORY_ENDPOINT?} \
+    -var reverse_proxy_server_ip=${REVERSE_PROXY_SERVER_IP} \
+    -var vpc_network=${VPC_NETWORK} \
+    -var project_id=${PROJECT_ID?} \
+    -var access_token=$(gcloud auth print-access-token) \
+    -var region=${REGION?} google_service_directory_namespace.reverse_proxy projects/vpc-sc-demo-nicholascain15/locations/us-central1/namespaces/df-namespace
+
+  terraform import \
+    -var service_directory_namespace=${SERVICE_DIRECTORY_NAMESPACE?} \
+    -var service_directory_service=${SERVICE_DIRECTORY_SERVICE?} \
+    -var service_directory_endpoint=${SERVICE_DIRECTORY_ENDPOINT?} \
+    -var reverse_proxy_server_ip=${REVERSE_PROXY_SERVER_IP} \
+    -var vpc_network=${VPC_NETWORK} \
+    -var project_id=${PROJECT_ID?} \
+    -var access_token=$(gcloud auth print-access-token) \
+    -var region=${REGION?} google_service_directory_service.reverse_proxy projects/vpc-sc-demo-nicholascain15/locations/us-central1/namespaces/df-namespace/services/df-service
+
+  terraform import \
+    -var service_directory_namespace=${SERVICE_DIRECTORY_NAMESPACE?} \
+    -var service_directory_service=${SERVICE_DIRECTORY_SERVICE?} \
+    -var service_directory_endpoint=${SERVICE_DIRECTORY_ENDPOINT?} \
+    -var reverse_proxy_server_ip=${REVERSE_PROXY_SERVER_IP} \
+    -var vpc_network=${VPC_NETWORK} \
+    -var project_id=${PROJECT_ID?} \
+    -var access_token=$(gcloud auth print-access-token) \
+    -var region=${REGION?} google_compute_network.vpc_network projects/vpc-sc-demo-nicholascain15/global/networks/webhook-net
+
+  import google_compute_network.vpc_network projects/vpc-sc-demo-nicholascain15/global/networks/webhook-net
+
+
+  terraform init && terraform apply --auto-approve \
+    -var access_token=$(gcloud auth print-access-token) \
+    -var project_id=${PROJECT_ID?} \
+    -var region=${REGION?} \
+    -var bucket=${PROJECT_ID?}-tf \
+    -var webhook_name=${WEBHOOK_NAME?} \
+
+  curl -s -X POST \
+    -H "Authorization: Bearer $(gcloud auth print-access-token)" \
+    -H "Content-Type:application/json" \
+    -H "x-goog-user-project: ${PROJECT_ID?}" \
+    -d \
+    '{
+      "displayName": "Telecommunications",
+      "defaultLanguageCode": "en",
+      "timeZone": "America/Chicago"
+    }' \
+    "https://${REGION?}-dialogflow.googleapis.com/v3/projects/${PROJECT_ID?}/locations/${REGION?}/agents"
+
+  export AGENT_NAME=$(curl -s -X GET -H "Authorization: Bearer $(gcloud auth print-access-token)" \
+    -H "Content-Type:application/json" \
+    -H "x-goog-user-project: ${PROJECT_ID}" \
+    "https://${REGION?}-dialogflow.googleapis.com/v3/projects/${PROJECT_ID?}/locations/${REGION?}/agents" | jq -r '.agents[0].name')
+
+  curl -s -X POST \
+    -H "Authorization: Bearer $(gcloud auth print-access-token)" \
+    -H "Content-Type:application/json" \
+    -H "x-goog-user-project: ${PROJECT_ID?}" \
+    -d \
+    '{
+     "agentUri": "gs://gassets-api-ai/prebuilt_agents/cx-prebuilt-agents/exported_agent_Telecommunications.blob"
+    }' \
+    "https://${REGION?}-dialogflow.googleapis.com/v3/${AGENT_NAME?}:restore"
+  '''

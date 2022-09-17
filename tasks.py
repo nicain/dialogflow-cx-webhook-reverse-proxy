@@ -366,11 +366,13 @@ def configure(c,
   if vpc:
     login_sa(c, settings["SETUP_SA_NAME"], build_dir)
     c.run(f'gcloud compute networks create {settings["NETWORK"]} --project={settings["PROJECT_ID"]} --subnet-mode=custom', warn=True)
-    c.run(f'gcloud compute firewall-rules create allow --network {settings["NETWORK"]} --allow tcp:22,tcp:3389,icmp', warn=True)
+    c.run(f'gcloud compute firewall-rules create allow \
+      --network {settings["NETWORK"]} \
+      --allow tcp:22,tcp:3389,icmp', warn=True)
     c.run(f'gcloud compute firewall-rules create allow-dialogflow \
+      --network={settings["NETWORK"]} \
       --direction=INGRESS \
       --priority=1000 \
-      --network={settings["NETWORK"]} \
       --action=ALLOW \
       --rules=tcp:443 \
       --source-ranges=35.199.192.0/19 \

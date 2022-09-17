@@ -62,6 +62,10 @@ terraform {
   required_providers {
     google = "~> 3.17.0"
   }
+  backend "gcs" {
+    bucket  = "vpc-sc-demo-nicholascain15-tf"
+    prefix  = "terraform/state"
+  }
 }
 
 resource "google_compute_network" "vpc_network" {

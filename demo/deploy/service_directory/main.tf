@@ -1,3 +1,8 @@
+variable "bucket" {
+  description = "Service Directory Namespace"
+  type        = string
+}
+
 variable "service_directory_namespace" {
   description = "Service Directory Namespace"
   type        = string
@@ -79,6 +84,10 @@ provider "google" {
 terraform {
   required_providers {
     google = "~> 3.17.0"
+  }
+  backend "gcs" {
+    bucket  = var.bucket
+    prefix  = "terraform/state"
   }
 }
 
