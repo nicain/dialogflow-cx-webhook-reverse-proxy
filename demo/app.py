@@ -343,12 +343,12 @@ def webhook_ingress_internal_only_status():
   headers['Authorization'] = f'Bearer {token}'
   r = requests.get(f'https://cloudfunctions.googleapis.com/v1/projects/{project_id}/locations/{region}/functions/{webhook_name}', headers=headers)
   if r.status_code == 403:
+    if (r.json()['error']['status'] == 'PERMISSION_DENIED') and (r.json()['error']['message'].startswith("Permission 'cloudfunctions.functions.get' denied on resource")):
+      return Response(status=200, response=json.dumps({'status':'BLOCKED', 'reason':'PERMISSION_DENIED'}))
     for details in r.json()['error']['details']:
       for violation in details['violations']:
         if violation['type'] == 'VPC_SERVICE_CONTROLS':
           return Response(status=200, response=json.dumps({'status':'BLOCKED', 'reason':'VPC_SERVICE_CONTROLS'}))
-    if r.json()['error']['status'] == 'PERMISSION_DENIED':
-      return Response(status=200, response=json.dumps({'status':'BLOCKED', 'reason':'PERMISSION_DENIED'}))
     return Response(status=500, response=r.text)
   if r.status_code != 200:
     app.logger.info(f'  cloudfunctions API rejected request: {r.text}')
@@ -376,12 +376,12 @@ def webhook_access_allow_unauthenticated_status():
   headers['Authorization'] = f'Bearer {token}'
   r = requests.get(f'https://cloudfunctions.googleapis.com/v2/projects/{project_id}/locations/{region}/functions/{webhook_name}:getIamPolicy', headers=headers)
   if r.status_code == 403:
+    if (r.json()['error']['status'] == 'PERMISSION_DENIED') and (r.json()['error']['message'].startswith('Permission \'cloudfunctions.functions.getIamPolicy\' denied')):
+      return Response(status=200, response=json.dumps({'status':'BLOCKED', 'reason':'PERMISSION_DENIED'}))
     for details in r.json()['error']['details']:
       for violation in details['violations']:
         if violation['type'] == 'VPC_SERVICE_CONTROLS':
           return Response(status=200, response=json.dumps({'status':'BLOCKED', 'reason':'VPC_SERVICE_CONTROLS'}))
-    if r.json()['error']['status'] == 'PERMISSION_DENIED':
-      return Response(status=200, response=json.dumps({'status':'BLOCKED', 'reason':'PERMISSION_DENIED'}))
     return Response(status=500, response=r.text)
   if r.status_code != 200:
     app.logger.info(f'  cloudfunctions API rejected request: {r.text}')
