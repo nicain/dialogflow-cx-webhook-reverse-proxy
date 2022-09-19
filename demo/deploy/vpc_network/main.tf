@@ -44,10 +44,6 @@ output "project_id" {
   value = var.project_id
 }
 
-output "access_token" {
-  value = var.access_token
-}
-
 output "region" {
   value = var.region
 }
@@ -64,7 +60,7 @@ terraform {
   }
   backend "gcs" {
     bucket  = "vpc-sc-demo-nicholascain15-tf"
-    prefix  = "terraform/state"
+    prefix  = "terraform/state-vpc-network"
   }
 }
 

@@ -67,10 +67,6 @@ output "project_id" {
   value = var.project_id
 }
 
-output "access_token" {
-  value = var.access_token
-}
-
 output "region" {
   value = var.region
 }
@@ -86,8 +82,8 @@ terraform {
     google = "~> 3.17.0"
   }
   backend "gcs" {
-    bucket  = var.bucket
-    prefix  = "terraform/state"
+    bucket  = "vpc-sc-demo-nicholascain15-tf"
+    prefix  = "terraform/state-service-directory"
   }
 }
 
