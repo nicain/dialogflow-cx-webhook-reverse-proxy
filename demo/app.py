@@ -663,29 +663,28 @@ def get_principal():
   
 
 @task
-def tf_init(c, access_token, plan, bucket):
-  workdir = f'/app/deploy/{plan}'
-  prefix = f'terraform/{plan}'
-
-  result = c.run(f'\
+def tf_init(c, access_token, bucket, workdir='/app/deploy'):
+  promise = c.run(f'\
     cd {workdir} &&\
-    terraform init -reconfigure -backend-config="access_token={access_token}" -backend-config="bucket={bucket}" -backend-config="prefix={prefix}"\
-  ', warn=True, hide=True)
+    terraform init -upgrade -reconfigure -backend-config="access_token={access_token}" -backend-config="bucket={bucket}" -backend-config="prefix=terraform/vpc_sc_demo"\
+  ', warn=True, hide=True, asynchronous=True)
+  result = promise.join()
   assert result.exited == 0
 
 
 @task
-def tf_plan(c, access_token, plan, destroy=False, json_output=True):
+def tf_plan(c, access_token, destroy=False, json_output=True, target=None, workdir='/app/deploy'):
 
+  target_option = f'-target={target}' if target else ''
   destroy_option = '--destroy' if destroy==True else ''
   json_option = '-json' if json_output==True else ''
 
-  workdir = f'/app/deploy/{plan}'
-  result = c.run(f'\
+  promise = c.run(f'\
     cd {workdir} &&\
     export GOOGLE_OAUTH_ACCESS_TOKEN={access_token} &&\
-    terraform plan -detailed-exitcode -var-file="testing.tfvars" {json_option} {destroy_option}\
-  ', warn=True, hide=True)
+    terraform plan -detailed-exitcode -var-file="testing.tfvars" -var access_token=\'{access_token}\' {json_option} {destroy_option} {target_option} -compact-warnings\
+  ', warn=True, hide=True, asynchronous=True)
+  result = promise.join()
   if result.stderr:
     print(result.stderr)
     return None
@@ -696,58 +695,65 @@ def tf_plan(c, access_token, plan, destroy=False, json_output=True):
     for line in lines:
       if line:
         message = json.loads(line)
-        if message['type'] == 'planned_change':
+        if message["@level"] == "error":
+          app.logger.error(json.dumps(message, indent=2))
+        elif message['type'] == 'planned_change':
           planned_changes.append(message['change'])
+        elif message["@level"] == "info":
+          pass
+        elif message['type'] == 'diagnostic' and message['@message'] == 'Warning: Resource targeting is in effect':
+          pass
+        elif message['type'] in ['refresh_start', 'refresh_complete']:
+          pass
+        else:
+          print(json.dumps(message, indent=2))
     return planned_changes
   else:
     print(result.stdout)
 
 
 @task
-def tf_import(c, access_token, plan, address, resource):
-  workdir = f'/app/deploy/{plan}'
-  result = c.run(f'\
+def tf_import(c, access_token, address, resource, workdir = '/app/deploy'):
+  promise = c.run(f'\
     cd {workdir} &&\
     export GOOGLE_OAUTH_ACCESS_TOKEN={access_token} &&\
     terraform import -var-file="testing.tfvars" "{address}" "{resource}"\
-  ', warn=True, hide=True)
+  ', warn=True, hide=True, asynchronous=True)
+  result = promise.join()
   print(result.stdout)
 
 
 @task
-def tf_apply(c, access_token, plan):
+def tf_apply(c, access_token, destroy=False, workdir='/app/deploy', target=None, json_output=True):
 
-  plan_import = {
-    'vpc_network':{}, 
-    'service_directory':{},
-    'webhook':{}
-  }
-  plan_import['vpc_network']['google_compute_network.vpc_network'] = 'projects/vpc-sc-demo-nicholascain15/global/networks/webhook-net'
-  plan_import['vpc_network']['google_compute_router.nat_router'] = 'projects/vpc-sc-demo-nicholascain15/regions/us-central1/routers/nat-router'
-  plan_import['vpc_network']['google_compute_firewall.allow_dialogflow'] = 'projects/vpc-sc-demo-nicholascain15/global/firewalls/allow-dialogflow'
-  plan_import['vpc_network']['google_compute_firewall.allow'] = 'projects/vpc-sc-demo-nicholascain15/global/firewalls/allow' 
-  plan_import['vpc_network']['google_compute_subnetwork.reverse_proxy_subnetwork'] = 'projects/vpc-sc-demo-nicholascain15/regions/us-central1/subnetworks/webhook-subnet' 
-  plan_import['vpc_network']['google_compute_address.reverse_proxy_address'] = 'projects/vpc-sc-demo-nicholascain15/regions/us-central1/addresses/webhook-reverse-proxy-address'
-  plan_import['vpc_network']['google_compute_router_nat.nat_manual'] = 'projects/vpc-sc-demo-nicholascain15/regions/us-central1/routers/nat-router/nat-config'
-  plan_import['service_directory']['google_compute_network.vpc_network'] = 'projects/vpc-sc-demo-nicholascain15/global/networks/webhook-net'
-  plan_import['service_directory']['google_service_directory_namespace.reverse_proxy'] = 'projects/vpc-sc-demo-nicholascain15/locations/us-central1/namespaces/df-namespace'
-  plan_import['service_directory']['google_service_directory_service.reverse_proxy'] = 'projects/vpc-sc-demo-nicholascain15/locations/us-central1/namespaces/df-namespace/services/df-service'
-  plan_import['service_directory']['google_service_directory_endpoint.reverse_proxy'] = 'projects/vpc-sc-demo-nicholascain15/locations/us-central1/namespaces/df-namespace/services/df-service/endpoints/df-endpoint'
-  plan_import['webhook']['google_cloudfunctions_function.function'] = 'projects/vpc-sc-demo-nicholascain15/locations/us-central1/functions/custom-telco-webhook'
+  destroy_option = '--destroy' if destroy==True else ''
+  target_option = f'-target={target}' if target else ''
+  json_option = '-json' if json_output==True else ''
 
-
-  for address, resource in plan_import[plan].items():
-    tf_import(c, access_token, plan, address, resource)
-
-  workdir = f'/app/deploy/{plan}'
-  result = c.run(f'\
+  promise = c.run(f'\
     cd {workdir} &&\
     export GOOGLE_OAUTH_ACCESS_TOKEN={access_token} &&\
-    terraform apply --auto-approve -var-file="testing.tfvars"\
-  ', warn=True)
-  if result.stderr:
-    print(result.stderr)
-  print(result.stdout)
+    terraform apply --auto-approve -var-file="testing.tfvars" -var access_token=\'{access_token}\' {destroy_option} \'{target_option}\' {json_option}  -compact-warnings\
+  ', warn=True, asynchronous=True)
+  result = promise.join()
+
+  print(result.stderr)
+
+  if json_output:
+    lines = result.stdout.split('\n')
+    for line in lines:
+      if line.strip():
+        message = json.loads(line)
+        if message['type'] in ['apply_start', 'apply_complete', 'change_summary']:
+          print(json.dumps(message, indent=2))
+        elif message["@level"] == "error":
+          print(json.dumps(message, indent=2))
+        else:
+          pass
+
+    return
+  else:
+    print(result.stdout)
 
 
 @app.route('/dev', methods=['GET'])
@@ -759,14 +765,82 @@ def dev():
 
   c = context.Context()
 
-  plan = 'webhook'
-  tf_init(c, access_token=access_token, plan=plan, bucket='vpc-sc-demo-nicholascain15-tf')
-  # tf_import(c, access_token=access_token, plan=plan)
-  tf_apply(c, access_token=access_token, plan=plan)
+  bucket = 'vpc-sc-demo-nicholascain15-tf'
+  project_addresses = [
+    # "google_project_service.services",
+    # "google_storage_bucket.bucket",
+    # "google_compute_network.vpc_network",
+    # "google_compute_router.nat_router",
+    # "google_compute_router_nat.nat_manual",
+    # "google_compute_firewall.allow_dialogflow",
+    # "google_compute_firewall.allow",
+    # "google_compute_subnetwork.reverse_proxy_subnetwork",
+    # "google_compute_address.reverse_proxy_address",
+    # "google_cloudfunctions_function.webhook",
+    # "google_storage_bucket_object.archive",
+    # "google_service_directory_namespace.reverse_proxy",
+    # "google_service_directory_service.reverse_proxy",
+    # "google_service_directory_endpoint.reverse_proxy",
+    "google_dialogflow_cx_agent.full_agent",
+  ]
+
+
+  tf_init(c, access_token=access_token, bucket=bucket)
+  deployed = set()
+  not_deployed = set()
+  error = set()
+  # missing = set()
+  for address in project_addresses:
+    app.logger.info(f'  Collecting: {address}')
+    for change in tf_plan(c, access_token=access_token, json_output=True, destroy=True, target=address):
+      deployed.add(change['resource']['addr'])
+      # if change['resource']['addr'] not in address:
+      #   missing.add(change['resource']['addr'])
+    for change in tf_plan(c, access_token=access_token, json_output=True, destroy=False, target=address):
+      not_deployed.add(change['resource']['addr'])
+      # if change['resource']['addr'] not in address:
+      #   missing.add(change['resource']['addr'])
+    if address not in deployed and address not in not_deployed and address is not 'google_project_service.services':
+      error.add(address)
+  for address in not_deployed:
+    tf_apply(c, access_token, destroy=False, target=address)
+  # for address in deployed:
+  #   tf_apply(c, access_token, destroy=True, target=address)
+  status = {
+    'deployed': sorted(list(deployed)), 
+    'not_deployed': sorted(list(not_deployed)),
+    'error': sorted(list(error)),
+    # 'missing': sorted(list(missing)),
+  }
+  return Response(status=200, response=json.dumps(status, indent=2))
+
+
+  # destroy = False
+  # target='google_dialogflow_cx_agent.full_agent'
+  # tf_init(c, access_token=access_token, bucket=bucket)
+  # changes = tf_plan(c, access_token=access_token, json_output=True, destroy=destroy, target=target)
+  # tf_apply(c, access_token, destroy=destroy, target=target)
+  # return Response(status=200, response='OK')
+
+
+  # tf_init(c, access_token=access_token, bucket=bucket)
+  # tf_apply(c, access_token, destroy=True, target='google_storage_bucket.bucket')
+  # tf_apply(c, access_token, destroy=True, target='google_dialogflow_cx_agent.full_agent')
+  # tf_apply(c, access_token, destroy=True, target='google_compute_network.vpc_network')
+  # tf_apply(c, access_token, destroy=True, target='google_compute_subnetwork.reverse_proxy_subnetwork')
   return Response(status=200, response='OK')
-  # changes = tf_plan(c, access_token=access_token, plan=plan, json_output=True)
-  # print(changes)
-  # return Response(status=200, response=str(len(changes)))
+
+  # tf_init(c, access_token=access_token, bucket=bucket)
+  # tf_import(c, access_token, 'google_dialogflow_cx_agent.full_agent', 'projects/vpc-sc-demo-nicholascain15/locations/us-central1/agents/70006bf3-af58-43a1-abec-6e50f789828b')
+  # return Response(status=200, response='OK')
+
+
+  
+  
+
+
+
+
 
   # result_dict = {}
   # for tfdir in ['apis', 'service_directory', 'vpc_network', 'webhook']:
@@ -776,10 +850,6 @@ def dev():
   #   print(planned_changes)
   #   result_dict[tfdir] = len(planned_changes)
   # return Response(status=200, response=json.dumps(result_dict))
-
-
-
-
 
   # tf = pt.Terraform(working_dir='/app/terraform')
 #   tf.init()
@@ -899,3 +969,26 @@ def dev():
     }' \
     "https://${REGION?}-dialogflow.googleapis.com/v3/${AGENT_NAME?}:restore"
   '''
+
+
+  # plan_import = {
+  #   'vpc_network':{}, 
+  #   'service_directory':{},
+  #   'webhook':{}
+  # }
+  # plan_import['vpc_network']['google_compute_network.vpc_network'] = 'projects/vpc-sc-demo-nicholascain15/global/networks/webhook-net'
+  # plan_import['vpc_network']['google_compute_router.nat_router'] = 'projects/vpc-sc-demo-nicholascain15/regions/us-central1/routers/nat-router'
+  # plan_import['vpc_network']['google_compute_firewall.allow_dialogflow'] = 'projects/vpc-sc-demo-nicholascain15/global/firewalls/allow-dialogflow'
+  # plan_import['vpc_network']['google_compute_firewall.allow'] = 'projects/vpc-sc-demo-nicholascain15/global/firewalls/allow' 
+  # plan_import['vpc_network']['google_compute_subnetwork.reverse_proxy_subnetwork'] = 'projects/vpc-sc-demo-nicholascain15/regions/us-central1/subnetworks/webhook-subnet' 
+  # plan_import['vpc_network']['google_compute_address.reverse_proxy_address'] = 'projects/vpc-sc-demo-nicholascain15/regions/us-central1/addresses/webhook-reverse-proxy-address'
+  # plan_import['vpc_network']['google_compute_router_nat.nat_manual'] = 'projects/vpc-sc-demo-nicholascain15/regions/us-central1/routers/nat-router/nat-config'
+  # plan_import['service_directory']['google_compute_network.vpc_network'] = 'projects/vpc-sc-demo-nicholascain15/global/networks/webhook-net'
+  # plan_import['service_directory']['google_service_directory_namespace.reverse_proxy'] = 'projects/vpc-sc-demo-nicholascain15/locations/us-central1/namespaces/df-namespace'
+  # plan_import['service_directory']['google_service_directory_service.reverse_proxy'] = 'projects/vpc-sc-demo-nicholascain15/locations/us-central1/namespaces/df-namespace/services/df-service'
+  # plan_import['service_directory']['google_service_directory_endpoint.reverse_proxy'] = 'projects/vpc-sc-demo-nicholascain15/locations/us-central1/namespaces/df-namespace/services/df-service/endpoints/df-endpoint'
+  # plan_import['webhook']['google_cloudfunctions_function.function'] = 'projects/vpc-sc-demo-nicholascain15/locations/us-central1/functions/custom-telco-webhook'
+
+
+  # for address, resource in plan_import[plan].items():
+  #   tf_import(c, access_token, plan, address, resource)

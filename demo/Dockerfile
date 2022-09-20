@@ -5,6 +5,7 @@ RUN apk add py3-pip
 RUN apk add build-base
 RUN apk add python3-dev
 RUN apk add --update nodejs npm
+RUN apk add jq
 
 ARG PROD
 ENV PROD=${PROD:-true}

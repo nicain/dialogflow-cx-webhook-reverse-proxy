@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 set -e
 
-SHORT=r::,p::,w::,h
-LONG=region::,project_id::,webhook_name::,help
+SHORT=r::,p::,w::,t::,h
+LONG=region::,project_id::,webhook_name::,token::,help
 OPTS=$(getopt -a --options $SHORT --longoptions $LONG -- "$@")
 
 help()
@@ -10,6 +10,7 @@ help()
     echo "Usage: deploy_agent [ -r | --region     ]
                     [ -p | --project_id   ]
                     [ -w | --webhook_name ]
+                    [ -t | --token ]
                     [ -h | --help         ]"
     exit 2
 }
@@ -37,6 +38,10 @@ do
       WEBHOOK_NAME="$2"
       shift 2
       ;;
+    -t | --token )
+      TOKEN="$2"
+      shift 2
+      ;;
     -h | --help)
       help
       ;;
@@ -53,22 +58,8 @@ done
 
 WEBHOOK_TRIGGER_URI="https://${REGION?}-${PROJECT_ID?}.cloudfunctions.net/${WEBHOOK_NAME?}"
 
-echo 'Creating agent...'
-curl -s -X POST \
-  -H "Authorization: Bearer $(gcloud auth print-access-token)" \
-  -H "Content-Type:application/json" \
-  -H "x-goog-user-project: ${PROJECT_ID?}" \
-  -d \
-  '{
-    "displayName": "Telecommunications",
-    "defaultLanguageCode": "en",
-    "timeZone": "America/Chicago"
-  }' \
-  "https://${REGION?}-dialogflow.googleapis.com/v3/projects/${PROJECT_ID?}/locations/${REGION?}/agents"
-echo '  Done creating agent.'
-
 echo 'Getting agent name...'
-AGENT_FULL_NAME=$(curl -s -X GET -H "Authorization: Bearer $(gcloud auth print-access-token)" \
+AGENT_FULL_NAME=$(curl -s -X GET -H "Authorization: Bearer ${TOKEN}" \
   -H "Content-Type:application/json" \
   -H "x-goog-user-project: ${PROJECT_ID}" \
   "https://${REGION?}-dialogflow.googleapis.com/v3/projects/${PROJECT_ID?}/locations/${REGION?}/agents" | jq -r '.agents[0].name')
@@ -76,7 +67,7 @@ echo '  Done getting agent name.'
 
 echo 'Restoring agent...'
 curl -s -X POST \
-  -H "Authorization: Bearer $(gcloud auth print-access-token)" \
+  -H "Authorization: Bearer ${TOKEN}" \
   -H "Content-Type:application/json" \
   -H "x-goog-user-project: ${PROJECT_ID?}" \
   -d \
@@ -89,14 +80,14 @@ echo '  Done restoring agent.'
 
 echo 'Getting webhook name...'
 WEBHOOK_FULL_NAME=$(curl -s -X GET \
-  -H "Authorization: Bearer $(gcloud auth print-access-token)" \
+  -H "Authorization: Bearer ${TOKEN}" \
   -H "x-goog-user-project: ${PROJECT_ID?}" \
   "https://${REGION?}-dialogflow.googleapis.com/v3/${AGENT_FULL_NAME?}/webhooks" | jq -r '.webhooks[0].name')
 echo '  Done getting webhook name.'
 
 echo 'Setting webhook fulfillment to Cloud Function...'
 curl -s -X PATCH \
-  -H "Authorization: Bearer $(gcloud auth print-access-token)" \
+  -H "Authorization: Bearer ${TOKEN}" \
   -H "Content-Type:application/json" \
   -H "x-goog-user-project: ${PROJECT_ID?}" \
   -d \
