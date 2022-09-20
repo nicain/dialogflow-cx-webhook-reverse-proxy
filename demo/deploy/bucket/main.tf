@@ -1,10 +1,3 @@
-
-
-variable "access_token" {
-  description = "Access Token"
-  type        = string
-}
-
 variable "project_id" {
   description = "Project ID"
   type        = string
@@ -41,7 +34,6 @@ resource "google_storage_bucket" "bucket" {
 provider "google" {
   project     = var.project_id
   region      = var.region
-  access_token = var.access_token
 }
 
 terraform {

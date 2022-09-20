@@ -1,3 +1,4 @@
+from urllib import response
 from flask import Flask, request, Response, abort, render_template, send_from_directory, redirect, url_for
 import os
 import logging
@@ -8,7 +9,7 @@ import uuid
 import zipfile
 import io
 
-import python_terraform as pt
+from invoke import task, context
 from urllib.parse import urlparse 
 
 from google.oauth2 import id_token
@@ -125,7 +126,7 @@ def get_token(request, token_type='access'):
 
   if not request.cookies.get("session_id"):
     app.logger.info(f'get_token request did not have a session_id')
-    return None
+    return {'response': Response(status=200, response=json.dumps({'status':'BLOCKED', 'reason':'BAD_SESSION_ID'}))}
 
   params = {
     'session_id': request.cookies.get("session_id"),
@@ -134,7 +135,7 @@ def get_token(request, token_type='access'):
   r = requests.get(AUTH_SERVICE_AUTH_ENDPOINT, params=params)
   if r.status_code == 401:
     app.logger.info(f'  auth-service "{AUTH_SERVICE_AUTH_ENDPOINT}" rejected request: {r.text}')
-    return None
+    return {'response': Response(status=500, response=json.dumps({'status':'BLOCKED', 'reason':'REJECTED_REQUEST'}))}
 
   zf = zipfile.ZipFile(io.BytesIO(r.content))
   key_bytes_stream = zf.open('key').read()
@@ -148,33 +149,34 @@ def get_token(request, token_type='access'):
   except ValueError as e:
     if "Token expired" in str(e):
       app.logger.info(f'  auth-service token expired')
-      return None
+      return {'response': Response(status=200, response=json.dumps({'status':'BLOCKED', 'reason':'TOKEN_EXPIRED'}))}
     else:
-      app.logger.info(f'  auth-service ValueError: {r.text}')
-      return None
+      response = f'  auth-service ValueError: {r.text}'
+      app.logger.info(response)
+      return {'response': Response(status=500, response=json.dumps({'status':'BLOCKED', 'reason':response.lstrip()}))}
 
   if info['email_verified'] != True:
     app.logger.info(f'  oauth error: email not verified')
-    return None
+    return {'response': Response(status=500, response=json.dumps({'status':'BLOCKED', 'reason':'BAD_EMAIL'}))}
 
   r = requests.get(AUTH_SERVICE_VERIFY_AUD_ENDPOINT, params={'aud': info['aud']})
   if r.status_code != 200 or r.json()['verified'] != True:
-    app.logger.info(f'  auth-service "{AUTH_SERVICE_VERIFY_AUD_ENDPOINT}" rejected request: {r.text}')
-    return None
+    response = f'  auth-service "{AUTH_SERVICE_VERIFY_AUD_ENDPOINT}" rejected request: {r.text}'
+    app.logger.info(response)
+    return {'response': Response(status=500, response=json.dumps({'status':'BLOCKED', 'reason':response.lstrip()}))}
 
-  # if info['email'] not in authorized_emails:
-  #   app.logger.info(f'  User "{info["email"]}" Not authorized')
-  #   return None
-
-  if token_type == 'access':
-    return auth_data['access_token']
-  elif token_type == 'identity':
-    return auth_data['id_token']
-  elif token_type == 'principal':
-    return info['email']
+  response = {}
+  if token_type == 'access_token':
+    response['access_token'] = auth_data['access_token']
+  elif token_type == 'id_token':
+    response['id_token'] = auth_data['id_token']
+  elif token_type == 'email':
+    response['email'] = auth_data['email']
   else:
-    app.logger.info(f'  Requested token_type "{token_type}" not one of ["access","identity"]')
-    return None
+    response = f'  Requested token_type "{token_type}" not one of ["access_token","id_token","email"]'
+    app.logger.info(response)
+    return {'response': Response(status=500, response=json.dumps({'status':'BLOCKED', 'reason':response.lstrip()}))}
+  return response
 
 
 @app.route('/session', methods=['GET'])
@@ -255,9 +257,10 @@ def get_restricted_services_status(token, project_id):
 @app.route('/restricted_services_status_cloudfunctions', methods=['GET'])
 def restricted_services_status_cloudfunctions():
   app.logger.info(f'/restricted_services_status_cloudfunctions:')
-  token = get_token(request)
-  if not token:
-    return Response(status=200, response=json.dumps({'status':'BLOCKED', 'reason':'NO_TOKEN'}))
+  token_dict = get_token(request, token_type='access_token')
+  if 'response' in token_dict:
+    return token_dict['response']
+  token = token_dict['access_token']
 
   project_id = request.args['project_id']
   status_dict = get_restricted_services_status(token, project_id)
@@ -271,9 +274,10 @@ def restricted_services_status_cloudfunctions():
 @app.route('/restricted_services_status_dialogflow', methods=['GET'])
 def restricted_services_status_dialogflow():
   app.logger.info(f'/restricted_services_status_dialogflow:')
-  token = get_token(request)
-  if not token:
-    return Response(status=200, response=json.dumps({'status':'BLOCKED', 'reason':'NO_TOKEN'}))
+  token_dict = get_token(request, token_type='access_token')
+  if 'response' in token_dict:
+    return token_dict['response']
+  token = token_dict['access_token']
 
   project_id = request.args['project_id']
   status_dict = get_restricted_services_status(token, project_id)
@@ -330,9 +334,10 @@ def get_webhooks(token, agent_name, project_id, region):
 @app.route('/webhook_ingress_internal_only_status', methods=['GET'])
 def webhook_ingress_internal_only_status():
   app.logger.info(f'/webhook_ingress_internal_only_status:')
-  token = get_token(request)
-  if not token:
-    return Response(status=200, response=json.dumps({'status':'BLOCKED', 'reason':'NO_TOKEN'}))
+  token_dict = get_token(request, token_type='access_token')
+  if 'response' in token_dict:
+    return token_dict['response']
+  token = token_dict['access_token']
 
   project_id = request.args['project_id']
   region = request.args['region']
@@ -363,9 +368,10 @@ def webhook_ingress_internal_only_status():
 @app.route('/webhook_access_allow_unauthenticated_status', methods=['GET'])
 def webhook_access_allow_unauthenticated_status():
   app.logger.info(f'/webhook_access_allow_unauthenticated_status:')
-  token = get_token(request)
-  if not token:
-    return Response(status=200, response=json.dumps({'status':'BLOCKED', 'reason':'NO_TOKEN'}))
+  token_dict = get_token(request, token_type='access_token')
+  if 'response' in token_dict:
+    return token_dict['response']
+  token = token_dict['access_token']
 
   project_id = request.args['project_id']
   region = request.args['region']
@@ -403,9 +409,10 @@ def webhook_access_allow_unauthenticated_status():
 @app.route('/update_webhook_access', methods=['POST'])
 def update_webhook_access():
   app.logger.info('update_webhook_access:')
-  token = get_token(request)
-  if not token:
-    return Response(status=200, response=json.dumps({'status':'BLOCKED', 'reason':'NO_TOKEN'}))
+  token_dict = get_token(request, token_type='access_token')
+  if 'response' in token_dict:
+    return token_dict['response']
+  token = token_dict['access_token']
 
   content = request.get_json(silent=True)
   internal_only = content['status']
@@ -460,9 +467,10 @@ def update_webhook_access():
 
 @app.route('/update_webhook_ingress', methods=['POST'])
 def update_webhook_ingress():
-  token = get_token(request)
-  if not token:
-    return Response(status=200, response=json.dumps({'status':'BLOCKED', 'reason':'NO_TOKEN'}))
+  token_dict = get_token(request, token_type='access_token')
+  if 'response' in token_dict:
+    return token_dict['response']
+  token = token_dict['access_token']
 
   project_id = request.args['project_id']
   region = request.args['region']
@@ -532,9 +540,10 @@ def update_security_perimeter(token, api, restrict_access, project_id):
 @app.route('/update_security_perimeter_cloudfunctions', methods=['POST'])
 def update_security_perimeter_cloudfunctions():
   app.logger.info('update_security_perimeter_cloudfunctions:')
-  token = get_token(request)
-  if not token:
-    return Response(status=200, response=json.dumps({'status':'BLOCKED', 'reason':'NO_TOKEN'}))
+  token_dict = get_token(request, token_type='access_token')
+  if 'response' in token_dict:
+    return token_dict['response']
+  token = token_dict['access_token']
 
   project_id = request.args['project_id']
 
@@ -546,9 +555,10 @@ def update_security_perimeter_cloudfunctions():
 @app.route('/update_security_perimeter_dialogflow', methods=['POST'])
 def update_security_perimeter_dialogflow():
   app.logger.info('update_security_perimeter_dialogflow:')
-  token = get_token(request)
-  if not token:
-    return Response(status=200, response=json.dumps({'status':'BLOCKED', 'reason':'NO_TOKEN'}))
+  token_dict = get_token(request, token_type='access_token')
+  if 'response' in token_dict:
+    return token_dict['response']
+  token = token_dict['access_token']
 
   project_id = request.args['project_id']
 
@@ -560,9 +570,10 @@ def update_security_perimeter_dialogflow():
 @app.route('/service_directory_webhook_fulfillment_status', methods=['GET'])
 def service_directory_webhook_fulfillment_status():
   app.logger.info(f'/service_directory_webhook_fulfillment_status:')
-  token = get_token(request)
-  if not token:
-    return Response(status=200, response=json.dumps({'status':'BLOCKED', 'reason':'NO_TOKEN'}))
+  token_dict = get_token(request, token_type='access_token')
+  if 'response' in token_dict:
+    return token_dict['response']
+  token = token_dict['access_token']
 
   project_id = request.args['project_id']
   region = request.args['region']
@@ -584,9 +595,11 @@ def service_directory_webhook_fulfillment_status():
 @app.route('/update_service_directory_webhook_fulfillment', methods=['POST'])
 def update_service_directory_webhook_fulfillment():
   app.logger.info(f'/update_service_directory_webhook_fulfillment:')
-  token = get_token(request)
-  if not token:
-    return Response(status=200, response=json.dumps({'status':'BLOCKED', 'reason':'NO_TOKEN'}))
+  token_dict = get_token(request, token_type='access_token')
+  if 'response' in token_dict:
+    return token_dict['response']
+  token = token_dict['access_token']
+
   content = request.get_json(silent=True)
   if content['status'] == True:
     fulfillment = 'service-directory'
@@ -643,63 +656,161 @@ def update_service_directory_webhook_fulfillment():
 
 @app.route('/get_principal', methods=['GET'])
 def get_principal():
-  principal = get_token(request, token_type='principal')
-  return Response(status=200, response=json.dumps({'principal': principal}))
+  token_dict = get_token(request, token_type='email')
+  if 'response' in token_dict:
+    return token_dict['response']
+  return Response(status=200, response=json.dumps({'principal': token_dict['email']}))
   
 
+@task
+def tf_init(c, access_token, plan, bucket):
+  workdir = f'/app/deploy/{plan}'
+  prefix = f'terraform/{plan}'
 
+  result = c.run(f'\
+    cd {workdir} &&\
+    terraform init -reconfigure -backend-config="access_token={access_token}" -backend-config="bucket={bucket}" -backend-config="prefix={prefix}"\
+  ', warn=True, hide=True)
+  assert result.exited == 0
+
+
+@task
+def tf_plan(c, access_token, plan, destroy=False, json_output=True):
+
+  destroy_option = '--destroy' if destroy==True else ''
+  json_option = '-json' if json_output==True else ''
+
+  workdir = f'/app/deploy/{plan}'
+  result = c.run(f'\
+    cd {workdir} &&\
+    export GOOGLE_OAUTH_ACCESS_TOKEN={access_token} &&\
+    terraform plan -detailed-exitcode -var-file="testing.tfvars" {json_option} {destroy_option}\
+  ', warn=True, hide=True)
+  if result.stderr:
+    print(result.stderr)
+    return None
+  
+  if json_output:
+    planned_changes = []
+    lines = result.stdout.split('\n')
+    for line in lines:
+      if line:
+        message = json.loads(line)
+        if message['type'] == 'planned_change':
+          planned_changes.append(message['change'])
+    return planned_changes
+  else:
+    print(result.stdout)
+
+
+@task
+def tf_import(c, access_token, plan, address, resource):
+  workdir = f'/app/deploy/{plan}'
+  result = c.run(f'\
+    cd {workdir} &&\
+    export GOOGLE_OAUTH_ACCESS_TOKEN={access_token} &&\
+    terraform import -var-file="testing.tfvars" "{address}" "{resource}"\
+  ', warn=True, hide=True)
+  print(result.stdout)
+
+
+@task
+def tf_apply(c, access_token, plan):
+
+  plan_import = {
+    'vpc_network':{}, 
+    'service_directory':{},
+    'webhook':{}
+  }
+  plan_import['vpc_network']['google_compute_network.vpc_network'] = 'projects/vpc-sc-demo-nicholascain15/global/networks/webhook-net'
+  plan_import['vpc_network']['google_compute_router.nat_router'] = 'projects/vpc-sc-demo-nicholascain15/regions/us-central1/routers/nat-router'
+  plan_import['vpc_network']['google_compute_firewall.allow_dialogflow'] = 'projects/vpc-sc-demo-nicholascain15/global/firewalls/allow-dialogflow'
+  plan_import['vpc_network']['google_compute_firewall.allow'] = 'projects/vpc-sc-demo-nicholascain15/global/firewalls/allow' 
+  plan_import['vpc_network']['google_compute_subnetwork.reverse_proxy_subnetwork'] = 'projects/vpc-sc-demo-nicholascain15/regions/us-central1/subnetworks/webhook-subnet' 
+  plan_import['vpc_network']['google_compute_address.reverse_proxy_address'] = 'projects/vpc-sc-demo-nicholascain15/regions/us-central1/addresses/webhook-reverse-proxy-address'
+  plan_import['vpc_network']['google_compute_router_nat.nat_manual'] = 'projects/vpc-sc-demo-nicholascain15/regions/us-central1/routers/nat-router/nat-config'
+  plan_import['service_directory']['google_compute_network.vpc_network'] = 'projects/vpc-sc-demo-nicholascain15/global/networks/webhook-net'
+  plan_import['service_directory']['google_service_directory_namespace.reverse_proxy'] = 'projects/vpc-sc-demo-nicholascain15/locations/us-central1/namespaces/df-namespace'
+  plan_import['service_directory']['google_service_directory_service.reverse_proxy'] = 'projects/vpc-sc-demo-nicholascain15/locations/us-central1/namespaces/df-namespace/services/df-service'
+  plan_import['service_directory']['google_service_directory_endpoint.reverse_proxy'] = 'projects/vpc-sc-demo-nicholascain15/locations/us-central1/namespaces/df-namespace/services/df-service/endpoints/df-endpoint'
+  plan_import['webhook']['google_cloudfunctions_function.function'] = 'projects/vpc-sc-demo-nicholascain15/locations/us-central1/functions/custom-telco-webhook'
+
+
+  for address, resource in plan_import[plan].items():
+    tf_import(c, access_token, plan, address, resource)
+
+  workdir = f'/app/deploy/{plan}'
+  result = c.run(f'\
+    cd {workdir} &&\
+    export GOOGLE_OAUTH_ACCESS_TOKEN={access_token} &&\
+    terraform apply --auto-approve -var-file="testing.tfvars"\
+  ', warn=True)
+  if result.stderr:
+    print(result.stderr)
+  print(result.stdout)
 
 
 @app.route('/dev', methods=['GET'])
 def dev():
-  access_token = get_token(request, token_type='access')
-  if not access_token:
-    return Response(status=200, response=json.dumps({'status':'BLOCKED', 'reason':'NO_TOKEN'}))
+  token_dict = get_token(request, token_type='access_token')
+  if 'response' in token_dict:
+    return token_dict['response']
+  access_token = token_dict['access_token']
 
-  project_id = "vpc-sc-demo-nicholascain15"
-  webhook_name = "custom-telco-webhook"
-  region = "us-central1"
-  # project_id = request.args['project_id']
-  # region = request.args['region']
-  # webhook_name = request.args['webhook_name']
+  c = context.Context()
 
-  variables = {
-    'project_id':project_id,
-    'access_token':access_token,
-    'region': region,
-    'bucket': project_id,
-    'webhook_name': webhook_name,
-  }
-  tf = pt.Terraform(working_dir='/app/terraform')
-  tf.init()
-  return_code, stdout, stderr = tf.plan(out="plan.out", variables=variables, refresh=False)
-  if return_code not in [0,2]:
-    response = f'({return_code}) Terraform Plan Failure:\n  stdoud: {stdout}\n  stderr: {stderr}'
-    app.logger.error(response)
-    if "Changes to Outputs:" in stdout:
-      app.logger.error("Old state detected. Destroying and re-applying...")
-      return_code, stdout, stderr = tf.apply("plan.out", skip_plan=True, var=None, destroy=True)
-      if return_code != 0:
-        response = f'({return_code}) Terraform Destroy Failure:\n  stdoud: {stdout}\n  stderr: {stderr}'
-        app.logger.error(response)
-        return Response(status=500, response=response)
-      return_code, stdout, stderr = tf.plan(out="plan.out", variables=variables)
-      if return_code not in [0,2]:
-        response = f'({return_code}) Terraform Plan Failure:\n  stdoud: {stdout}\n  stderr: {stderr}'
-        app.logger.error(response)
-        return Response(status=500, response=response)
-    else:
-      return Response(status=500, response=response)
-
-  return_code, stdout, stderr = tf.apply("plan.out", skip_plan=True, var=None)
-  if return_code != 0:
-    response = f'({return_code}) Terraform Apply Failure:\n  stdoud: {stdout}\n  stderr: {stderr}'
-    app.logger.error(response)
-    return Response(status=500, response=response)
-  
-  app.logger.info('Terraform plan deployed.')
+  plan = 'webhook'
+  tf_init(c, access_token=access_token, plan=plan, bucket='vpc-sc-demo-nicholascain15-tf')
+  # tf_import(c, access_token=access_token, plan=plan)
+  tf_apply(c, access_token=access_token, plan=plan)
   return Response(status=200, response='OK')
-# Error: Error acquiring the state lock
+  # changes = tf_plan(c, access_token=access_token, plan=plan, json_output=True)
+  # print(changes)
+  # return Response(status=200, response=str(len(changes)))
+
+  # result_dict = {}
+  # for tfdir in ['apis', 'service_directory', 'vpc_network', 'webhook']:
+  #   workdir = f'/app/deploy/{tfdir}'
+  #   tf_init(c, access_token=access_token, workdir=workdir)
+  #   planned_changes = tf_plan(c, access_token=access_token, workdir=workdir)
+  #   print(planned_changes)
+  #   result_dict[tfdir] = len(planned_changes)
+  # return Response(status=200, response=json.dumps(result_dict))
+
+
+
+
+
+  # tf = pt.Terraform(working_dir='/app/terraform')
+#   tf.init()
+#   return_code, stdout, stderr = tf.plan(out="plan.out", variables=variables, refresh=False)
+#   if return_code not in [0,2]:
+#     response = f'({return_code}) Terraform Plan Failure:\n  stdoud: {stdout}\n  stderr: {stderr}'
+#     app.logger.error(response)
+#     if "Changes to Outputs:" in stdout:
+#       app.logger.error("Old state detected. Destroying and re-applying...")
+#       return_code, stdout, stderr = tf.apply("plan.out", skip_plan=True, var=None, destroy=True)
+#       if return_code != 0:
+#         response = f'({return_code}) Terraform Destroy Failure:\n  stdoud: {stdout}\n  stderr: {stderr}'
+#         app.logger.error(response)
+#         return Response(status=500, response=response)
+#       return_code, stdout, stderr = tf.plan(out="plan.out", variables=variables)
+#       if return_code not in [0,2]:
+#         response = f'({return_code}) Terraform Plan Failure:\n  stdoud: {stdout}\n  stderr: {stderr}'
+#         app.logger.error(response)
+#         return Response(status=500, response=response)
+#     else:
+#       return Response(status=500, response=response)
+
+#   return_code, stdout, stderr = tf.apply("plan.out", skip_plan=True, var=None)
+#   if return_code != 0:
+#     response = f'({return_code}) Terraform Apply Failure:\n  stdoud: {stdout}\n  stderr: {stderr}'
+#     app.logger.error(response)
+#     return Response(status=500, response=response)
+  
+#   app.logger.info('Terraform plan deployed.')
+#   return Response(status=200, response='OK')
+# # Error: Error acquiring the state lock
 
 
   '''

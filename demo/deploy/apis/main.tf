@@ -1,10 +1,3 @@
-
-
-variable "access_token" {
-  description = "Access Token"
-  type        = string
-}
-
 variable "project_id" {
   description = "Project ID"
   type        = string
@@ -26,12 +19,20 @@ output "region" {
 provider "google" {
   project     = var.project_id
   region      = var.region
-  access_token = var.access_token
+}
+
+terraform {
+  required_providers {
+    google = "~> 3.17.0"
+  }
+  backend "gcs" {
+    bucket  = "vpc-sc-demo-nicholascain15-tf"
+    prefix  = "terraform/apis"
+  }
 }
 
 resource "google_project_service" "service" {
   for_each = toset([
-    "cloudresourcemanager.googleapis.com",
     "cloudfunctions.googleapis.com",
     "compute.googleapis.com",
     "iam.googleapis.com",

@@ -1,10 +1,4 @@
 
-
-variable "access_token" {
-  description = "Access Token"
-  type        = string
-}
-
 variable "project_id" {
   description = "Project ID"
   type        = string
@@ -56,12 +50,15 @@ data "archive_file" "source" {
 provider "google" {
   project     = var.project_id
   region      = var.region
-  access_token = var.access_token
 }
 
 terraform {
   required_providers {
     google = "~> 3.17.0"
+  }
+  backend "gcs" {
+    bucket  = null
+    prefix  = null
   }
 }
 

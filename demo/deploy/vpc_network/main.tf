@@ -18,11 +18,6 @@ variable "project_id" {
   type        = string
 }
 
-variable "access_token" {
-  description = "Access Token"
-  type        = string
-}
-
 variable "region" {
   description = "Region"
   type        = string
@@ -51,7 +46,6 @@ output "region" {
 provider "google" {
   project     = var.project_id
   region      = var.region
-  access_token = var.access_token
 }
 
 terraform {

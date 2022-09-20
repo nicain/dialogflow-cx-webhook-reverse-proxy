@@ -33,11 +33,6 @@ variable "project_id" {
   type        = string
 }
 
-variable "access_token" {
-  description = "Access Token"
-  type        = string
-}
-
 variable "region" {
   description = "Region"
   type        = string
@@ -74,7 +69,6 @@ output "region" {
 provider "google" {
   project     = var.project_id
   region      = var.region
-  access_token = var.access_token
 }
 
 terraform {
@@ -82,8 +76,8 @@ terraform {
     google = "~> 3.17.0"
   }
   backend "gcs" {
-    bucket  = "vpc-sc-demo-nicholascain15-tf"
-    prefix  = "terraform/state-service-directory"
+    bucket  = null
+    prefix  = null
   }
 }
 
@@ -114,8 +108,11 @@ resource "google_service_directory_endpoint" "reverse_proxy" {
   provider    = google-beta
   endpoint_id = var.service_directory_endpoint
   service     = google_service_directory_service.reverse_proxy.id
-
-  network = "projects/${data.google_project.project.number}/locations/${var.region}/networks/${google_compute_network.vpc_network.name}"
+  metadata = {
+    stage  = "prod"
+    region = var.region
+  }
+  network = "projects/${data.google_project.project.number}/locations/global/networks/${google_compute_network.vpc_network.name}"
   address = var.reverse_proxy_server_ip
   port    = 443
 }
