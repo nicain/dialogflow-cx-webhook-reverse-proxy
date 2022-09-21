@@ -235,9 +235,9 @@ resource "google_dialogflow_cx_agent" "full_agent" {
   default_language_code = "en"
   time_zone = "America/Chicago"
   project = var.project_id
+  enable_spell_correction = true
 
   provisioner "local-exec" {
-    command = "./deploy_agent.sh -r=${var.region} -p=${var.project_id} -w=${var.webhook_name} -t=${var.access_token}"
+    command = "./deploy_agent.sh --region=${var.region} --project_id=${var.project_id} --webhook_name=${var.webhook_name} --token=${var.access_token}"
   }
-
 }

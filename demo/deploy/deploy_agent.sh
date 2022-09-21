@@ -59,15 +59,15 @@ done
 WEBHOOK_TRIGGER_URI="https://${REGION?}-${PROJECT_ID?}.cloudfunctions.net/${WEBHOOK_NAME?}"
 
 echo 'Getting agent name...'
-AGENT_FULL_NAME=$(curl -s -X GET -H "Authorization: Bearer ${TOKEN}" \
+AGENT_FULL_NAME=$(curl -s -X GET -H "Authorization: Bearer ${TOKEN?}" \
   -H "Content-Type:application/json" \
-  -H "x-goog-user-project: ${PROJECT_ID}" \
+  -H "x-goog-user-project: ${PROJECT_ID?}" \
   "https://${REGION?}-dialogflow.googleapis.com/v3/projects/${PROJECT_ID?}/locations/${REGION?}/agents" | jq -r '.agents[0].name')
 echo '  Done getting agent name.'
 
 echo 'Restoring agent...'
 curl -s -X POST \
-  -H "Authorization: Bearer ${TOKEN}" \
+  -H "Authorization: Bearer ${TOKEN?}" \
   -H "Content-Type:application/json" \
   -H "x-goog-user-project: ${PROJECT_ID?}" \
   -d \
@@ -80,14 +80,14 @@ echo '  Done restoring agent.'
 
 echo 'Getting webhook name...'
 WEBHOOK_FULL_NAME=$(curl -s -X GET \
-  -H "Authorization: Bearer ${TOKEN}" \
+  -H "Authorization: Bearer ${TOKEN?}" \
   -H "x-goog-user-project: ${PROJECT_ID?}" \
   "https://${REGION?}-dialogflow.googleapis.com/v3/${AGENT_FULL_NAME?}/webhooks" | jq -r '.webhooks[0].name')
 echo '  Done getting webhook name.'
 
 echo 'Setting webhook fulfillment to Cloud Function...'
 curl -s -X PATCH \
-  -H "Authorization: Bearer ${TOKEN}" \
+  -H "Authorization: Bearer ${TOKEN?}" \
   -H "Content-Type:application/json" \
   -H "x-goog-user-project: ${PROJECT_ID?}" \
   -d \

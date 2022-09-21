@@ -64,6 +64,8 @@ AUTH_SERVICE_VERIFY_AUD_ENDPOINT = f'http://{AUTH_SERVICE_HOSTNAME}/verify_aud'
 AUTH_SERVICE_LOGIN_ENDPOINT = f'http://{AUTH_SERVICE_HOSTNAME}/login'
 PING_WEBHOOK_EXTERNAL_PROXY_ENDPOINT = f'http://{AUTH_SERVICE_HOSTNAME}/ping_webhook_external_proxy'
 
+TF_PLAN_STORAGE_BUCKET = 'vpc-sc-demo-nicholascain15-tf'
+
 SERVICE_DIRECTORY_NAMESPACE = 'df-namespace'
 SERVICE_DIRECTORY_SERVICE = 'df-service'
 DOMAIN = 'webhook.internal'
@@ -673,11 +675,16 @@ def tf_init(c, access_token, bucket, workdir='/app/deploy'):
 
 
 @task
-def tf_plan(c, access_token, destroy=False, json_output=True, target=None, workdir='/app/deploy'):
+def tf_plan(c, access_token, mode='deploy', json_output=True, target=None, workdir='/app/deploy'):
 
   target_option = f'-target={target}' if target else ''
-  destroy_option = '--destroy' if destroy==True else ''
-  json_option = '-json' if json_output==True else ''
+  json_option = '-json' if json_output==True else '-no-color'
+  if mode == 'deploy':
+    destroy_option = ''
+  elif mode == 'destroy':
+    destroy_option = '--destroy'
+  else:
+    raise RuntimeError(f"Unexpected option for mode: {mode}")
 
   promise = c.run(f'\
     cd {workdir} &&\
@@ -693,7 +700,7 @@ def tf_plan(c, access_token, destroy=False, json_output=True, target=None, workd
     planned_changes = []
     lines = result.stdout.split('\n')
     for line in lines:
-      if line:
+      if line.strip():
         message = json.loads(line)
         if message["@level"] == "error":
           app.logger.error(json.dumps(message, indent=2))
@@ -709,7 +716,7 @@ def tf_plan(c, access_token, destroy=False, json_output=True, target=None, workd
           print(json.dumps(message, indent=2))
     return planned_changes
   else:
-    print(result.stdout)
+    return {'stdout': result.stdout, 'stderr':result.stderr}
 
 
 @task
@@ -724,11 +731,16 @@ def tf_import(c, access_token, address, resource, workdir = '/app/deploy'):
 
 
 @task
-def tf_apply(c, access_token, destroy=False, workdir='/app/deploy', target=None, json_output=True):
+def tf_apply(c, access_token, mode='deploy', workdir='/app/deploy', target=None, json_output=True):
 
-  destroy_option = '--destroy' if destroy==True else ''
   target_option = f'-target={target}' if target else ''
-  json_option = '-json' if json_output==True else ''
+  json_option = '-json' if json_output==True else '-no-color'
+  if mode == 'deploy':
+    destroy_option = ''
+  elif mode == 'destroy':
+    destroy_option = '--destroy'
+  else:
+    raise RuntimeError(f"Unexpected option for mode: {mode}")
 
   promise = c.run(f'\
     cd {workdir} &&\
@@ -737,13 +749,13 @@ def tf_apply(c, access_token, destroy=False, workdir='/app/deploy', target=None,
   ', warn=True, asynchronous=True)
   result = promise.join()
 
-  print(result.stderr)
-
   if json_output:
+    output = []
     lines = result.stdout.split('\n')
     for line in lines:
       if line.strip():
         message = json.loads(line)
+        output.append(message)
         if message['type'] in ['apply_start', 'apply_complete', 'change_summary']:
           print(json.dumps(message, indent=2))
         elif message["@level"] == "error":
@@ -751,68 +763,81 @@ def tf_apply(c, access_token, destroy=False, workdir='/app/deploy', target=None,
         else:
           pass
 
-    return
+    return {'stdout': output, 'stderr':result.stderr}
   else:
-    print(result.stdout)
+    return {'stdout': result.stdout, 'stderr':result.stderr}
 
 
-@app.route('/dev', methods=['GET'])
-def dev():
+@app.route('/asset_status', methods=['GET'])
+def asset_status():
   token_dict = get_token(request, token_type='access_token')
   if 'response' in token_dict:
     return token_dict['response']
   access_token = token_dict['access_token']
 
   c = context.Context()
-
-  bucket = 'vpc-sc-demo-nicholascain15-tf'
-  project_addresses = [
-    # "google_project_service.services",
-    # "google_storage_bucket.bucket",
-    # "google_compute_network.vpc_network",
-    # "google_compute_router.nat_router",
-    # "google_compute_router_nat.nat_manual",
-    # "google_compute_firewall.allow_dialogflow",
-    # "google_compute_firewall.allow",
-    # "google_compute_subnetwork.reverse_proxy_subnetwork",
-    # "google_compute_address.reverse_proxy_address",
-    # "google_cloudfunctions_function.webhook",
-    # "google_storage_bucket_object.archive",
-    # "google_service_directory_namespace.reverse_proxy",
-    # "google_service_directory_service.reverse_proxy",
-    # "google_service_directory_endpoint.reverse_proxy",
-    "google_dialogflow_cx_agent.full_agent",
-  ]
-
-
-  tf_init(c, access_token=access_token, bucket=bucket)
+  tf_init(c, access_token=access_token, bucket=TF_PLAN_STORAGE_BUCKET)
   deployed = set()
   not_deployed = set()
   error = set()
-  # missing = set()
-  for address in project_addresses:
-    app.logger.info(f'  Collecting: {address}')
-    for change in tf_plan(c, access_token=access_token, json_output=True, destroy=True, target=address):
-      deployed.add(change['resource']['addr'])
-      # if change['resource']['addr'] not in address:
-      #   missing.add(change['resource']['addr'])
-    for change in tf_plan(c, access_token=access_token, json_output=True, destroy=False, target=address):
-      not_deployed.add(change['resource']['addr'])
-      # if change['resource']['addr'] not in address:
-      #   missing.add(change['resource']['addr'])
-    if address not in deployed and address not in not_deployed and address is not 'google_project_service.services':
-      error.add(address)
-  for address in not_deployed:
-    tf_apply(c, access_token, destroy=False, target=address)
-  # for address in deployed:
-  #   tf_apply(c, access_token, destroy=True, target=address)
+  for change in tf_plan(c, access_token=access_token, json_output=True, mode='destroy'):
+    deployed.add(change['resource']['addr'])
+  for change in tf_plan(c, access_token=access_token, json_output=True, mode='deploy'):
+    not_deployed.add(change['resource']['addr'])
   status = {
     'deployed': sorted(list(deployed)), 
     'not_deployed': sorted(list(not_deployed)),
     'error': sorted(list(error)),
-    # 'missing': sorted(list(missing)),
   }
   return Response(status=200, response=json.dumps(status, indent=2))
+
+
+@app.route('/update_target', methods=['GET'])
+def update_target():
+  token_dict = get_token(request, token_type='access_token')
+  if 'response' in token_dict:
+    return token_dict['response']
+  access_token = token_dict['access_token']
+
+  target = request.args['target']
+  mode = request.args['mode']
+
+  c = context.Context()
+  tf_init(c, access_token=access_token, bucket=TF_PLAN_STORAGE_BUCKET)
+  tf_plan(c, access_token=access_token, json_output=False, mode=mode, target=target)
+  result = tf_apply(c, access_token=access_token, json_output=False, mode=mode, target=target)
+  planned_changes = tf_plan(c, access_token=access_token, json_output=True, mode=mode, target=target)
+  if len(planned_changes) == 0:
+    return Response(status=200, response=json.dumps(result))
+  else:
+    return Response(status=500, response=json.dumps(result))
+
+
+
+
+  # for address in project_addresses:
+  #   app.logger.info(f'  Collecting: {address}')
+  #   for change in tf_plan(c, access_token=access_token, json_output=True, destroy=True, target=address):
+  #     deployed.add(change['resource']['addr'])
+  #     # if change['resource']['addr'] not in address:
+  #     #   missing.add(change['resource']['addr'])
+  #   for change in tf_plan(c, access_token=access_token, json_output=True, destroy=False, target=address):
+  #     not_deployed.add(change['resource']['addr'])
+  #     # if change['resource']['addr'] not in address:
+  #     #   missing.add(change['resource']['addr'])
+  #   if address not in deployed and address not in not_deployed and address != 'google_project_service.services':
+  #     error.add(address)
+  # # for address in deployed:
+  # #   tf_apply(c, access_token, destroy=True, target=address)
+  # for address in not_deployed:
+  #   tf_apply(c, access_token, destroy=False, target=address)
+  # status = {
+  #   'deployed': sorted(list(deployed)), 
+  #   'not_deployed': sorted(list(not_deployed)),
+  #   'error': sorted(list(error)),
+  #   # 'missing': sorted(list(missing)),
+  # }
+  
 
 
   # destroy = False
@@ -992,3 +1017,23 @@ def dev():
 
   # for address, resource in plan_import[plan].items():
   #   tf_import(c, access_token, plan, address, resource)
+
+
+
+  # project_addresses = [
+  #   "google_project_service.services",
+  #   "google_storage_bucket.bucket",
+  #   "google_compute_network.vpc_network",
+  #   "google_compute_router.nat_router",
+  #   "google_compute_router_nat.nat_manual",
+  #   "google_compute_firewall.allow_dialogflow",
+  #   "google_compute_firewall.allow",
+  #   "google_compute_subnetwork.reverse_proxy_subnetwork",
+  #   "google_compute_address.reverse_proxy_address",
+  #   "google_cloudfunctions_function.webhook",
+  #   "google_storage_bucket_object.archive",
+  #   "google_service_directory_namespace.reverse_proxy",
+  #   "google_service_directory_service.reverse_proxy",
+  #   "google_service_directory_endpoint.reverse_proxy",
+  #   "google_dialogflow_cx_agent.full_agent",
+  # ]
