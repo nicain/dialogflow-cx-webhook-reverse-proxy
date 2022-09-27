@@ -29,10 +29,9 @@ import Stream from '@mui/icons-material/Stream';
 import {useEffect} from "react";
 import {StateChangeButtonGrid} from './StateButtonGrid.js'
 import {StateImage} from './StateSlides.js'
-// import {LiveProjectInfo} from './LiveProjectInfo.js'
 import {QueryInfo} from './Info.js'
+import {AssetStatusPanel} from './AssetStatusPanel.js'
 import Tooltip from '@mui/material/Tooltip';
-import {SettingsPanel} from './SettingsPanel.js';
 
 const drawerWidth = 240;
 const TITLE = 'VPC-SC Live Demo'
@@ -173,29 +172,24 @@ function MiniDrawer(props) {
     props.dataModel.activePage.set(1); 
     resetStateOnPageChange(props.dataModel)
   }}/>
-  let DeployInstructionsButton = <DrawerButton open={open} text={"Launch Demo"} icon={Publish} dataModel={props.dataModel} pageNumber={2} onClick={() => {props.dataModel.activePage.set(2)}}/>
+  let DeployInstructionsButton = <DrawerButton open={open} text={"Launch Demo"} icon={Settings} dataModel={props.dataModel} pageNumber={2} onClick={() => {props.dataModel.activePage.set(2)}}/>
   let LiveDemoButton = <DrawerButton open={open} text={"Live Demo"} icon={Stream} dataModel={props.dataModel} pageNumber={3} onClick={() => {
     props.dataModel.activePage.set(3);
     resetStateOnPageChange(props.dataModel)
   }}/>
-  let SettingsButton = <DrawerButton open={open} text={"Settings"} icon={Settings} dataModel={props.dataModel} pageNumber={4} onClick={() => {
-    props.dataModel.activePage.set(4);
-  }}/>
   
   var StateChangeButtonGridCurr
-  // var LiveProjectInfoCurr
   var StateImageCurr
-  var SettingsCurr
+  var AssetStatusPanelCurr
   if (props.dataModel.activePage.current === 1) {
     StateImageCurr = <StateImage dataModel={props.dataModel}/>
     StateChangeButtonGridCurr = <StateChangeButtonGrid dataModel={props.dataModel} liveMode={false}/>
+  } else if (props.dataModel.activePage.current === 2) {
+    AssetStatusPanelCurr = <AssetStatusPanel dataModel={props.dataModel}/>
   } else if (props.dataModel.activePage.current === 3) {
     StateImageCurr = <StateImage dataModel={props.dataModel}/>
     StateChangeButtonGridCurr = <StateChangeButtonGrid dataModel={props.dataModel} liveMode={true}/>
-    // LiveProjectInfoCurr = <LiveProjectInfo dataModel={props.dataModel}/>
-  } else if (props.dataModel.activePage.current === 4) {
-    SettingsCurr = <SettingsPanel dataModel={props.dataModel}/>
-  }
+  } 
 
   return (
     <div>
@@ -235,9 +229,8 @@ function MiniDrawer(props) {
           <Divider />
           <List>
             {TutorialButton}
-            {DeployInstructionsButton}
             {LiveDemoButton}
-            {SettingsButton}
+            {DeployInstructionsButton}
           </List>
         </Drawer>
         <Box component="main" sx={{ flexGrow: 1, p: 3 }}>
@@ -258,8 +251,7 @@ function MiniDrawer(props) {
           </Typography>
           {StateImageCurr}
           {StateChangeButtonGridCurr}
-          {/* {LiveProjectInfoCurr} */}
-          {SettingsCurr}
+          {AssetStatusPanelCurr}
         </Box>
       </Box>
     </div>

@@ -79,8 +79,6 @@ function getControlElem(title, state, timeout, blocked_by_timeout, queryEndpoint
       <Item sx={{my: 0}} variant="string">{statusElem}</Item>
     </Box>
     <Item sx={{my: 0}} variant="string">{toggleStatusElem}</Item>
-
-    {/* <Foo /> */}
   </Grid>
 )}
 

@@ -53,6 +53,11 @@ variable "webhook_name" {
   type        = string
 }
 
+variable "webhook_src" {
+  description = "webhook_name"
+  type        = string
+}
+
 provider "google" {
   project     = var.project_id
   region      = var.region
@@ -73,33 +78,89 @@ terraform {
   }
 }
 
-resource "google_project_service" "services" {
-  for_each = toset([
-    "cloudfunctions.googleapis.com",
-    "compute.googleapis.com",
-    "iam.googleapis.com",
-    "dialogflow.googleapis.com",
-    "servicedirectory.googleapis.com",
-    "run.googleapis.com",
-    "cloudbuild.googleapis.com",
-    "cloudfunctions.googleapis.com",
-    "artifactregistry.googleapis.com",
-    "accesscontextmanager.googleapis.com",
-    "vpcaccess.googleapis.com",
-    "appengine.googleapis.com",
-  ])
-  service = each.key
+resource "google_project_service" "dialogflow" {
+  service = "dialogflow.googleapis.com"
   project            = var.project_id
   disable_on_destroy = true
   disable_dependent_services = true
 }
 
-resource "google_storage_bucket" "bucket" {
-  name     = var.bucket
-  location = "US"
-  project = var.project_id
-  force_destroy = true
+resource "google_project_service" "cloudfunctions" {
+  service = "cloudfunctions.googleapis.com"
+  project            = var.project_id
+  disable_on_destroy = true
+  disable_dependent_services = true
 }
+
+resource "google_project_service" "compute" {
+  service = "compute.googleapis.com"
+  project            = var.project_id
+  disable_on_destroy = true
+  disable_dependent_services = true
+}
+
+resource "google_project_service" "iam" {
+  service = "iam.googleapis.com"
+  project            = var.project_id
+  disable_on_destroy = true
+  disable_dependent_services = true
+}
+
+resource "google_project_service" "servicedirectory" {
+  service = "servicedirectory.googleapis.com"
+  project            = var.project_id
+  disable_on_destroy = true
+  disable_dependent_services = true
+}
+
+resource "google_project_service" "run" {
+  service = "run.googleapis.com"
+  project            = var.project_id
+  disable_on_destroy = true
+  disable_dependent_services = true
+}
+
+resource "google_project_service" "cloudbuild" {
+  service = "cloudbuild.googleapis.com"
+  project            = var.project_id
+  disable_on_destroy = true
+  disable_dependent_services = true
+}
+
+resource "google_project_service" "artifactregistry" {
+  service = "artifactregistry.googleapis.com"
+  project            = var.project_id
+  disable_on_destroy = true
+  disable_dependent_services = true
+}
+
+resource "google_project_service" "accesscontextmanager" {
+  service = "accesscontextmanager.googleapis.com"
+  project            = var.project_id
+  disable_on_destroy = true
+  disable_dependent_services = true
+}
+
+resource "google_project_service" "vpcaccess" {
+  service = "vpcaccess.googleapis.com"
+  project            = var.project_id
+  disable_on_destroy = true
+  disable_dependent_services = true
+}
+
+resource "google_project_service" "appengine" {
+  service = "appengine.googleapis.com"
+  project            = var.project_id
+  disable_on_destroy = true
+  disable_dependent_services = true
+}
+
+# resource "google_storage_bucket" "bucket" {
+#   name     = var.bucket
+#   location = "US"
+#   project = var.project_id
+#   force_destroy = true
+# }
 
 resource "google_compute_network" "vpc_network" {
   name = var.vpc_network
@@ -177,7 +238,7 @@ locals {
 
 data "archive_file" "source" {
   type        = "zip"
-  source_dir  = abspath("./webhook")
+  source_dir  = var.webhook_src
   output_path = local.archive_path
 }
 

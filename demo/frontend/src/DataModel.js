@@ -1,7 +1,7 @@
 import {useState} from "react";
 import {TIMER_SCALE} from "./StatusPollToggle.js"
 
-const project_id_default = "vpc-sc-demo-nicholascain14";
+const project_id_default = "vpc-sc-demo-nicholascain15";
 const webhook_name_default = "custom-telco-webhook";
 const region_default = "us-central1";
 
@@ -89,12 +89,86 @@ function ProjectData () {
   }
 }
 
+function AssetStatus() {
+  const dialogflowService = {current: null, set: null};
+  const cloudfunctionService = {current: null, set: null};
+  const computeService = {current: null, set: null};
+  const iamService = {current: null, set: null};
+  const servicedirectoryService = {current: null, set: null};
+  const runService = {current: null, set: null};
+  const cloudbuildService = {current: null, set: null};
+  const artifactregistryService = {current: null, set: null};
+  const accesscontextmanagerService = {current: null, set: null};
+  const vpcaccessService = {current: null, set: null};
+  const appengineService = {current: null, set: null};
+  const network = {current: null, set: null};
+  const subNetwork = {current: null, set: null};
+  const natRouter = {current: null, set: null};
+  const natManual = {current: null, set: null};
+  const firewallDialogflow = {current: null, set: null};
+  const firewallAllow = {current: null, set: null};
+  const proxyNamespace = {current: null, set:null};
+  const proxyService = {current: null, set:null};
+  const proxyEndpoint = {current: null, set:null};
+  const proxyAddress = {current: null, set:null};
+
+  [cloudfunctionService.current, cloudfunctionService.set] = useState(null);
+  [dialogflowService.current, dialogflowService.set] = useState(null);
+  [computeService.current, computeService.set] = useState(null); 
+  [iamService.current, iamService.set] = useState(null); 
+  [servicedirectoryService.current, servicedirectoryService.set] = useState(null); 
+  [runService.current, runService.set] = useState(null); 
+  [cloudbuildService.current, cloudbuildService.set] = useState(null); 
+  [artifactregistryService.current, artifactregistryService.set] = useState(null); 
+  [accesscontextmanagerService.current, accesscontextmanagerService.set] = useState(null); 
+  [vpcaccessService.current, vpcaccessService.set] = useState(null); 
+  [appengineService.current, appengineService.set] = useState(null); 
+  [network.current, network.set] = useState(null);
+  [subNetwork.current, subNetwork.set] = useState(null);
+  [natRouter.current, natRouter.set] = useState(null);
+  [natManual.current, natManual.set] = useState(null);
+  [firewallDialogflow.current, firewallDialogflow.set] = useState(null);
+  [firewallAllow.current, firewallAllow.set] = useState(null);
+  [proxyNamespace.current, proxyNamespace.set] = useState(null);
+  [proxyService.current, proxyService.set] = useState(null);
+  [proxyEndpoint.current, proxyEndpoint.set] = useState(null);
+  [proxyAddress.current, proxyAddress.set] = useState(null);
+
+
+  return {
+    "google_project_service.cloudfunctions": cloudfunctionService,
+    "google_project_service.dialogflow": dialogflowService,
+    "google_project_service.compute": computeService,
+    "google_project_service.iam": iamService,
+    "google_project_service.servicedirectory": servicedirectoryService,
+    "google_project_service.run": runService,
+    "google_project_service.cloudbuild": cloudbuildService,
+    "google_project_service.artifactregistry": artifactregistryService,
+    "google_project_service.accesscontextmanager": accesscontextmanagerService,
+    "google_project_service.vpcaccess": vpcaccessService,
+    "google_project_service.appengine": appengineService,
+    "google_compute_network.vpc_network": network,
+    "google_compute_subnetwork.reverse_proxy_subnetwork": subNetwork,
+    "google_compute_router.nat_router": natRouter,
+    "google_compute_router_nat.nat_manual": natManual,
+    "google_compute_firewall.allow_dialogflow": firewallDialogflow,
+    "google_compute_firewall.allow": firewallAllow,
+    "google_compute_address.reverse_proxy_address": proxyAddress,
+    "google_service_directory_namespace.reverse_proxy": proxyNamespace,
+    "google_service_directory_service.reverse_proxy": proxyService,
+    "google_service_directory_endpoint.reverse_proxy": proxyEndpoint,
+  }
+
+}
+
 function DataModel () {
   const pageMapper = BuildMapPageNumberToState();
   const loggedIn = {current: null, set: null};
   const pageNumber = {current: null, set: null};
   const renderedPageNumber = {current: null, set: null};
   const activePage = {current: null, set: null};
+  const terraformLocked = {current: null, set: null};
+  const validProjectId = {current: null, set: null};
 
   const allStates = {};
   allStates["dialogflowRestrictedState"] = getState();
@@ -112,6 +186,8 @@ function DataModel () {
   [pageNumber.current, pageNumber.set] = useState(33);
   [renderedPageNumber.current, renderedPageNumber.set] = useState(null);
   [activePage.current, activePage.set] = useState(0);
+  [terraformLocked.current, terraformLocked.set] = useState(false);
+  [validProjectId.current, validProjectId.set] = useState(false);
 
   const dataModel = {
     pageMapper: pageMapper,
@@ -121,6 +197,9 @@ function DataModel () {
     allStates: allStates,
     renderedPageNumber: renderedPageNumber,
     projectData: ProjectData(),
+    assetStatus: AssetStatus(),
+    terraformLocked:terraformLocked,
+    validProjectId:validProjectId,
   }
   return dataModel
 }

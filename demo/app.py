@@ -8,6 +8,7 @@ from base64 import b64encode
 import uuid
 import zipfile
 import io
+import tempfile
 
 from invoke import task, context
 from urllib.parse import urlparse 
@@ -664,108 +665,6 @@ def get_principal():
   return Response(status=200, response=json.dumps({'principal': token_dict['email']}))
   
 
-@task
-def tf_init(c, access_token, bucket, workdir='/app/deploy'):
-  promise = c.run(f'\
-    cd {workdir} &&\
-    terraform init -upgrade -reconfigure -backend-config="access_token={access_token}" -backend-config="bucket={bucket}" -backend-config="prefix=terraform/vpc_sc_demo"\
-  ', warn=True, hide=True, asynchronous=True)
-  result = promise.join()
-  assert result.exited == 0
-
-
-@task
-def tf_plan(c, access_token, mode='deploy', json_output=True, target=None, workdir='/app/deploy'):
-
-  target_option = f'-target={target}' if target else ''
-  json_option = '-json' if json_output==True else '-no-color'
-  if mode == 'deploy':
-    destroy_option = ''
-  elif mode == 'destroy':
-    destroy_option = '--destroy'
-  else:
-    raise RuntimeError(f"Unexpected option for mode: {mode}")
-
-  promise = c.run(f'\
-    cd {workdir} &&\
-    export GOOGLE_OAUTH_ACCESS_TOKEN={access_token} &&\
-    terraform plan -detailed-exitcode -var-file="testing.tfvars" -var access_token=\'{access_token}\' {json_option} {destroy_option} {target_option} -compact-warnings\
-  ', warn=True, hide=True, asynchronous=True)
-  result = promise.join()
-  if result.stderr:
-    print(result.stderr)
-    return None
-  
-  if json_output:
-    planned_changes = []
-    lines = result.stdout.split('\n')
-    for line in lines:
-      if line.strip():
-        message = json.loads(line)
-        if message["@level"] == "error":
-          app.logger.error(json.dumps(message, indent=2))
-        elif message['type'] == 'planned_change':
-          planned_changes.append(message['change'])
-        elif message["@level"] == "info":
-          pass
-        elif message['type'] == 'diagnostic' and message['@message'] == 'Warning: Resource targeting is in effect':
-          pass
-        elif message['type'] in ['refresh_start', 'refresh_complete']:
-          pass
-        else:
-          print(json.dumps(message, indent=2))
-    return planned_changes
-  else:
-    return {'stdout': result.stdout, 'stderr':result.stderr}
-
-
-@task
-def tf_import(c, access_token, address, resource, workdir = '/app/deploy'):
-  promise = c.run(f'\
-    cd {workdir} &&\
-    export GOOGLE_OAUTH_ACCESS_TOKEN={access_token} &&\
-    terraform import -var-file="testing.tfvars" "{address}" "{resource}"\
-  ', warn=True, hide=True, asynchronous=True)
-  result = promise.join()
-  print(result.stdout)
-
-
-@task
-def tf_apply(c, access_token, mode='deploy', workdir='/app/deploy', target=None, json_output=True):
-
-  target_option = f'-target={target}' if target else ''
-  json_option = '-json' if json_output==True else '-no-color'
-  if mode == 'deploy':
-    destroy_option = ''
-  elif mode == 'destroy':
-    destroy_option = '--destroy'
-  else:
-    raise RuntimeError(f"Unexpected option for mode: {mode}")
-
-  promise = c.run(f'\
-    cd {workdir} &&\
-    export GOOGLE_OAUTH_ACCESS_TOKEN={access_token} &&\
-    terraform apply --auto-approve -var-file="testing.tfvars" -var access_token=\'{access_token}\' {destroy_option} \'{target_option}\' {json_option}  -compact-warnings\
-  ', warn=True, asynchronous=True)
-  result = promise.join()
-
-  if json_output:
-    output = []
-    lines = result.stdout.split('\n')
-    for line in lines:
-      if line.strip():
-        message = json.loads(line)
-        output.append(message)
-        if message['type'] in ['apply_start', 'apply_complete', 'change_summary']:
-          print(json.dumps(message, indent=2))
-        elif message["@level"] == "error":
-          print(json.dumps(message, indent=2))
-        else:
-          pass
-
-    return {'stdout': output, 'stderr':result.stderr}
-  else:
-    return {'stdout': result.stdout, 'stderr':result.stderr}
 
 
 @app.route('/asset_status', methods=['GET'])
@@ -775,42 +674,363 @@ def asset_status():
     return token_dict['response']
   access_token = token_dict['access_token']
 
+  project_id = request.args['project_id']
+  debug = request.args.get('debug')
+
   c = context.Context()
-  tf_init(c, access_token=access_token, bucket=TF_PLAN_STORAGE_BUCKET)
-  deployed = set()
-  not_deployed = set()
-  error = set()
-  for change in tf_plan(c, access_token=access_token, json_output=True, mode='destroy'):
-    deployed.add(change['resource']['addr'])
-  for change in tf_plan(c, access_token=access_token, json_output=True, mode='deploy'):
-    not_deployed.add(change['resource']['addr'])
-  status = {
-    'deployed': sorted(list(deployed)), 
-    'not_deployed': sorted(list(not_deployed)),
-    'error': sorted(list(error)),
-  }
-  return Response(status=200, response=json.dumps(status, indent=2))
+  module = '/app/deploy/main.tf'
+  prefix = f'terraform/{project_id}'
+  with tempfile.TemporaryDirectory() as workdir:
+
+    result = tf_init(c, module, workdir, access_token, prefix, debug)
+    if result: return result
+
+    result = tf_plan(c, module, workdir, access_token, debug)
+    if result: return result
+
+    result = tf_state_list(c, module, workdir, access_token, debug)
+    if 'response' in result: return result["response"]
+    resources = result['resources']
+        
+    return Response(status=200, response=json.dumps({'status':'OK', 'resources':resources}, indent=2))
 
 
-@app.route('/update_target', methods=['GET'])
+#   token_dict = get_token(request, token_type='access_token')
+#   if 'response' in token_dict:
+#     return token_dict['response']
+#   access_token = token_dict['access_token']
+
+#   target = request.args['target']
+
+#   c = context.Context()
+#   module = '/app/deploy/main.tf'
+#   with tempfile.TemporaryDirectory() as workdir:
+#     tf_init(c, access_token=access_token, bucket=TF_PLAN_STORAGE_BUCKET, module=module, workdir=workdir)
+#     plan_response = tf_plan(c, access_token=access_token, json_output=True, mode='refresh', target=target, workdir=workdir)
+
+#   if plan_response['errors']:
+#     if 'SERVICE_DISABLED' in json.dumps(plan_response['errors']):
+#       reason = 'SERVICE_DISABLED'
+#     else:
+#       reason = 'UNKNOWN'
+#     return Response(status=200, response=json.dumps({
+#       'status': 'ERROR', 
+#       'errors': plan_response['errors'],
+#       'reason': reason,
+#       }, indent=2)
+#     )
+
+#   if not plan_response['planned_changes']:
+#     return Response(status=200, response=json.dumps({'status': True}, indent=2))
+#   else:
+#     return Response(status=200, response=json.dumps({'status': False}, indent=2))
+
+
+
+
+@task
+def tf_init(c, module, workdir, access_token, prefix, debug):
+  promise = c.run(f'\
+    cp {module} {workdir} &&\
+    terraform -chdir={workdir} init -upgrade -reconfigure -backend-config="access_token={access_token}" -backend-config="bucket={TF_PLAN_STORAGE_BUCKET}" -backend-config="prefix={prefix}"\
+  ', warn=True, hide=True, asynchronous=True)
+  result = promise.join()
+
+  if debug:
+    print(result.exited)
+    print(result.stdout)
+    print(result.stderr)
+
+  if result.exited:
+    return Response(status=500, response=json.dumps({
+      'status': 'ERROR',
+      'stdout': result.stdout,
+      'stderr': result.stderr,
+    }))
+
+
+@task
+def tf_plan(c, module, workdir, access_token, debug):
+  json_option = '-json' if not debug else ''
+  promise = c.run(f'\
+    cp {module} {workdir} &&\
+    export GOOGLE_OAUTH_ACCESS_TOKEN={access_token} &&\
+    terraform -chdir="{workdir}" plan {json_option} -refresh-only -var-file="/app/deploy/testing.tfvars" -var access_token=\'{access_token}\'\
+  ', warn=True, hide=True, asynchronous=True)
+  result = promise.join()
+
+  if debug:
+    print(result.exited)
+    print(result.stdout)
+    print(result.stderr)
+  else:
+    errors = []
+    lines = result.stdout.split('\n')
+    for line in lines:
+      if line.strip():
+        try:
+          message = json.loads(line)
+          if message["@level"] == "error":
+            app.logger.error(json.dumps(message, indent=2))
+            errors.append(message)
+        except:
+          print("COULD NOT LOAD", line)
+    if errors:
+      return Response(status=500, response=json.dumps({
+        'status': 'ERROR',
+        'errors': errors,
+      }))
+
+
+@task
+def tf_apply(c, module, workdir, access_token, debug, target, destroy):
+  target_option = f'-target={target}' if target else ''
+  json_option = '-json' if not debug else ''
+  destroy_option = '--destroy' if destroy == True else ''
+
+  promise = c.run(f'\
+    cp {module} {workdir} &&\
+    export GOOGLE_OAUTH_ACCESS_TOKEN={access_token} &&\
+    terraform -chdir="{workdir}" apply -lock-timeout=10s {json_option} --auto-approve -var-file="/app/deploy/testing.tfvars" -var access_token=\'{access_token}\' {destroy_option} {target_option}\
+  ', warn=True, hide=True, asynchronous=True)
+  result = promise.join()
+  if debug:
+    print(result.exited)
+    print(result.stdout)
+    print(result.stderr)
+  else:
+    errors = []
+    lines = result.stdout.split('\n')
+    for line in lines:
+      if line.strip():
+        try:
+          message = json.loads(line)
+          if message["@level"] == "error":
+            app.logger.error(json.dumps(message, indent=2))
+            errors.append(message)
+        except:
+          print("COULD NOT LOAD", line)
+    if errors:
+      return Response(status=500, response=json.dumps({
+        'status': 'ERROR',
+        'errors': errors,
+      }))
+
+@task
+def tf_state_list(c, module, workdir, access_token, debug):
+  promise = c.run(f'\
+    cp {module} {workdir} &&\
+    export GOOGLE_OAUTH_ACCESS_TOKEN={access_token} &&\
+    terraform -chdir="{workdir}" state list', warn=True, hide=True, asynchronous=True)
+  result = promise.join()
+
+  
+  if debug:
+    print(result.exited)
+    print(result.stdout)
+    print(result.stderr)
+
+  if result.exited:
+    return {'response':Response(status=500, response=json.dumps({
+      'status': 'ERROR',
+      'stdout': result.stdout,
+      'stderr': result.stderr,
+    }))}
+  else:
+    return {'resources': result.stdout.split()}
+
+# @task
+# def tf_state_pull(c, module, workdir, access_token, debug):
+#   promise = c.run(f'\
+#     cp {module} {workdir} &&\
+#     export GOOGLE_OAUTH_ACCESS_TOKEN={access_token} &&\
+#     terraform -chdir="{workdir}" state pull', warn=True, hide=True, asynchronous=True)
+#   result = promise.join()
+#   if debug:
+#     print(result.exited)
+#     print(result.stdout)
+#     print(result.stderr)
+
+#   if result.exited:
+#     return {'response':Response(status=500, response=json.dumps({
+#       'status': 'ERROR',
+#       'stdout': result.stdout,
+#       'stderr': result.stderr,
+#     }))}
+#   else:
+#     deployed_resources = [f'{r["type"]}.{r["name"]}' for r in json.loads(result.stdout)['resources'] if r["mode"]=='managed']
+#     return {'deployed_resources': deployed_resources}
+
+
+@app.route('/update_target', methods=['POST'])
 def update_target():
+  content = request.get_json(silent=True)
   token_dict = get_token(request, token_type='access_token')
   if 'response' in token_dict:
     return token_dict['response']
   access_token = token_dict['access_token']
 
-  target = request.args['target']
-  mode = request.args['mode']
+  project_id = request.args['project_id']
+  debug = request.args.get('debug')
+  targets = content['targets']
+  destroy = content['destroy']
 
   c = context.Context()
-  tf_init(c, access_token=access_token, bucket=TF_PLAN_STORAGE_BUCKET)
-  tf_plan(c, access_token=access_token, json_output=False, mode=mode, target=target)
-  result = tf_apply(c, access_token=access_token, json_output=False, mode=mode, target=target)
-  planned_changes = tf_plan(c, access_token=access_token, json_output=True, mode=mode, target=target)
-  if len(planned_changes) == 0:
-    return Response(status=200, response=json.dumps(result))
+  module = '/app/deploy/main.tf'
+  prefix = f'terraform/{project_id}'
+  with tempfile.TemporaryDirectory() as workdir:
+
+    result = tf_init(c, module, workdir, access_token, prefix, debug)
+    if result: return result
+
+    result = tf_plan(c, module, workdir, access_token, debug)
+    if result: return result
+
+    for target in targets:
+      result = tf_apply(c, module, workdir, access_token, debug, target, destroy)
+      if result: return result
+
+    result = tf_state_list(c, module, workdir, access_token, debug)
+    if 'response' in result: return result["response"]
+    resources = result['resources']
+        
+    return Response(status=200, response=json.dumps({'status':'OK', 'resources':resources}, indent=2))
+
+    # result = c.run(f'\
+    #   cp {module} {workdir} &&\
+    #   export GOOGLE_OAUTH_ACCESS_TOKEN={access_token} &&\
+    #   terraform -chdir="{workdir}" state pull', warn=True, hide=True
+    # )
+    # if result.exited:
+    #   return Response(status=500, response=json.dumps({
+    #     'status': 'ERROR',
+    #     'stdout': result.stdout,
+    #     'stderr': result.stderr,
+    #   }))
+    # status_list = [f'{r["type"]}.{r["name"]}' for r in json.loads(result.stdout)['resources'] if r["mode"]=='managed']
+    # print(len(status_list))
+
+
+@app.route('/validate_project_id', methods=['get'])
+def validate_project_id():
+  project_id = request.args['project_id']
+  token_dict = get_token(request, token_type='access_token')
+  if 'response' in token_dict:
+    return token_dict['response']
+  access_token = token_dict['access_token']
+
+  headers = {}
+  headers['Authorization'] = f'Bearer {access_token}'
+  r = requests.get(f'https://cloudresourcemanager.googleapis.com/v1/projects/{project_id}', headers=headers)
+
+  print(project_id, r.status_code == 200)
+
+  if r.status_code == 200:
+    return Response(status=200, response=json.dumps({'status':True}, indent=2))
   else:
-    return Response(status=500, response=json.dumps(result))
+    return Response(status=200, response=json.dumps({'status':False}, indent=2))
+
+
+@task
+def tf_unlock(c, module, workdir, access_token, debug, lock_id):
+  promise = c.run(f'\
+    cp {module} {workdir} &&\
+    export GOOGLE_OAUTH_ACCESS_TOKEN={access_token} &&\
+    terraform -chdir={workdir} force-unlock -force {lock_id}\
+  ', warn=True, hide=True, asynchronous=True)
+  result = promise.join()
+
+  if debug:
+    print(result.exited)
+    print(result.stdout)
+    print(result.stderr)
+
+  if result.exited:
+    return Response(status=500, response=json.dumps({
+      'status': 'ERROR',
+      'stdout': result.stdout,
+      'stderr': result.stderr,
+    }))
+
+
+@app.route('/unlock', methods=['post'])
+def unlock():
+  project_id = request.args['project_id']
+  debug = request.args.get('debug')
+  content = request.get_json(silent=True)
+  lock_id = content['lock_id']
+  token_dict = get_token(request, token_type='access_token')
+  if 'response' in token_dict:
+    return token_dict['response']
+  access_token = token_dict['access_token']
+
+  c = context.Context()
+  module = '/app/deploy/main.tf'
+  prefix = f'terraform/{project_id}'
+  with tempfile.TemporaryDirectory() as workdir:
+
+    result = tf_init(c, module, workdir, access_token, prefix, debug)
+    if result: return result
+
+    result = tf_unlock(c, module, workdir, access_token, debug, lock_id)
+    if result: return result
+
+  return Response(status=200, response=json.dumps({'status':'OK'}, indent=2))
+
+
+@task
+def tf_import(c, module, workdir, access_token, debug, target, resource):
+  promise = c.run(f'\
+    cp {module} {workdir} &&\
+    export GOOGLE_OAUTH_ACCESS_TOKEN={access_token} &&\
+    terraform -chdir={workdir} import -var-file="/app/deploy/testing.tfvars" -var access_token=\'{access_token}\' "{target}" "{resource}"\
+  ', warn=True, hide=True, asynchronous=True)
+  result = promise.join()
+
+  if debug:
+    print(result.exited)
+    print(result.stdout)
+    print(result.stderr)
+
+
+@app.route('/import', methods=['post'])
+def import_resource():
+  project_id = request.args['project_id']
+  target = request.args['target']
+  debug = request.args.get('debug', True)
+  content = request.get_json(silent=True)
+  resource_raw = content['resourceName']
+  resource = resource_raw.split('\'')[1]
+  token_dict = get_token(request, token_type='access_token')
+  if 'response' in token_dict:
+    return token_dict['response']
+  access_token = token_dict['access_token']
+
+
+  c = context.Context()
+  module = '/app/deploy/main.tf'
+  prefix = f'terraform/{project_id}'
+  with tempfile.TemporaryDirectory() as workdir:
+
+    result = tf_init(c, module, workdir, access_token, prefix, debug)
+    if result: return result
+
+    result = tf_import(c, module, workdir, access_token, debug, target, resource)
+    if result: return result
+
+  return Response(status=200, response=json.dumps({'status':'OK'}, indent=2))
+
+
+  # if True:
+  #   print('======INIT======')
+  #   tf_init(c, access_token=access_token, bucket=TF_PLAN_STORAGE_BUCKET, module=module, workdir=workdir, verbose=True)
+  #   print('=====REFRESH====')
+  #   # tf_plan(c, access_token=access_token, json_output=False, mode='refresh', workdir=workdir, verbose=True)
+  #   tf_apply(c, access_token=access_token, json_output=False, mode='deploy', workdir=workdir, verbose=True)
+  #   # print('=====DESTROY====')
+  #   # tf_apply(c, access_token=access_token, json_output=False, mode='destroy', target=target, workdir=workdir, verbose=True)
+  #   # tf_plan(c, access_token=access_token, json_output=False, mode='destroy', target=target, workdir=workdir, verbose=True)
+  #   print('=======END======')
 
 
 
@@ -853,7 +1073,7 @@ def update_target():
   # tf_apply(c, access_token, destroy=True, target='google_dialogflow_cx_agent.full_agent')
   # tf_apply(c, access_token, destroy=True, target='google_compute_network.vpc_network')
   # tf_apply(c, access_token, destroy=True, target='google_compute_subnetwork.reverse_proxy_subnetwork')
-  return Response(status=200, response='OK')
+  # return Response(status=200, response='OK')
 
   # tf_init(c, access_token=access_token, bucket=bucket)
   # tf_import(c, access_token, 'google_dialogflow_cx_agent.full_agent', 'projects/vpc-sc-demo-nicholascain15/locations/us-central1/agents/70006bf3-af58-43a1-abec-6e50f789828b')
@@ -908,92 +1128,91 @@ def update_target():
 # # Error: Error acquiring the state lock
 
 
-  '''
-  terraform init && terraform apply --auto-approve \
-    -var access_token=$(gcloud auth print-access-token) \
-    -var project_id=${PROJECT_ID?} \
-    -var vpc_network=${VPC_NETWORK} \
-    -var vpc_subnetwork=${VPC_SUBNETWORK} \
-    -var reverse_proxy_server_ip=${REVERSE_PROXY_SERVER_IP} \
-    -var region=${REGION?}
+  # terraform init && terraform apply --auto-approve \
+  #   -var access_token=$(gcloud auth print-access-token) \
+  #   -var project_id=${PROJECT_ID?} \
+  #   -var vpc_network=${VPC_NETWORK} \
+  #   -var vpc_subnetwork=${VPC_SUBNETWORK} \
+  #   -var reverse_proxy_server_ip=${REVERSE_PROXY_SERVER_IP} \
+  #   -var region=${REGION?}
 
-  terraform init && terraform apply --auto-approve \
-    -var service_directory_namespace=${SERVICE_DIRECTORY_NAMESPACE?} \
-    -var service_directory_service=${SERVICE_DIRECTORY_SERVICE?} \
-    -var service_directory_endpoint=${SERVICE_DIRECTORY_ENDPOINT?} \
-    -var reverse_proxy_server_ip=${REVERSE_PROXY_SERVER_IP} \
-    -var vpc_network=${VPC_NETWORK} \
-    -var project_id=${PROJECT_ID?} \
-    -var access_token=$(gcloud auth print-access-token) \
-    -var region=${REGION?}
+  # terraform init && terraform apply --auto-approve \
+  #   -var service_directory_namespace=${SERVICE_DIRECTORY_NAMESPACE?} \
+  #   -var service_directory_service=${SERVICE_DIRECTORY_SERVICE?} \
+  #   -var service_directory_endpoint=${SERVICE_DIRECTORY_ENDPOINT?} \
+  #   -var reverse_proxy_server_ip=${REVERSE_PROXY_SERVER_IP} \
+  #   -var vpc_network=${VPC_NETWORK} \
+  #   -var project_id=${PROJECT_ID?} \
+  #   -var access_token=$(gcloud auth print-access-token) \
+  #   -var region=${REGION?}
 
-  terraform import \
-    -var service_directory_namespace=${SERVICE_DIRECTORY_NAMESPACE?} \
-    -var service_directory_service=${SERVICE_DIRECTORY_SERVICE?} \
-    -var service_directory_endpoint=${SERVICE_DIRECTORY_ENDPOINT?} \
-    -var reverse_proxy_server_ip=${REVERSE_PROXY_SERVER_IP} \
-    -var vpc_network=${VPC_NETWORK} \
-    -var project_id=${PROJECT_ID?} \
-    -var access_token=$(gcloud auth print-access-token) \
-    -var region=${REGION?} google_service_directory_namespace.reverse_proxy projects/vpc-sc-demo-nicholascain15/locations/us-central1/namespaces/df-namespace
+  # terraform import \
+  #   -var service_directory_namespace=${SERVICE_DIRECTORY_NAMESPACE?} \
+  #   -var service_directory_service=${SERVICE_DIRECTORY_SERVICE?} \
+  #   -var service_directory_endpoint=${SERVICE_DIRECTORY_ENDPOINT?} \
+  #   -var reverse_proxy_server_ip=${REVERSE_PROXY_SERVER_IP} \
+  #   -var vpc_network=${VPC_NETWORK} \
+  #   -var project_id=${PROJECT_ID?} \
+  #   -var access_token=$(gcloud auth print-access-token) \
+  #   -var region=${REGION?} google_service_directory_namespace.reverse_proxy projects/vpc-sc-demo-nicholascain15/locations/us-central1/namespaces/df-namespace
 
-  terraform import \
-    -var service_directory_namespace=${SERVICE_DIRECTORY_NAMESPACE?} \
-    -var service_directory_service=${SERVICE_DIRECTORY_SERVICE?} \
-    -var service_directory_endpoint=${SERVICE_DIRECTORY_ENDPOINT?} \
-    -var reverse_proxy_server_ip=${REVERSE_PROXY_SERVER_IP} \
-    -var vpc_network=${VPC_NETWORK} \
-    -var project_id=${PROJECT_ID?} \
-    -var access_token=$(gcloud auth print-access-token) \
-    -var region=${REGION?} google_service_directory_service.reverse_proxy projects/vpc-sc-demo-nicholascain15/locations/us-central1/namespaces/df-namespace/services/df-service
+  # terraform import \
+  #   -var service_directory_namespace=${SERVICE_DIRECTORY_NAMESPACE?} \
+  #   -var service_directory_service=${SERVICE_DIRECTORY_SERVICE?} \
+  #   -var service_directory_endpoint=${SERVICE_DIRECTORY_ENDPOINT?} \
+  #   -var reverse_proxy_server_ip=${REVERSE_PROXY_SERVER_IP} \
+  #   -var vpc_network=${VPC_NETWORK} \
+  #   -var project_id=${PROJECT_ID?} \
+  #   -var access_token=$(gcloud auth print-access-token) \
+  #   -var region=${REGION?} google_service_directory_service.reverse_proxy projects/vpc-sc-demo-nicholascain15/locations/us-central1/namespaces/df-namespace/services/df-service
 
-  terraform import \
-    -var service_directory_namespace=${SERVICE_DIRECTORY_NAMESPACE?} \
-    -var service_directory_service=${SERVICE_DIRECTORY_SERVICE?} \
-    -var service_directory_endpoint=${SERVICE_DIRECTORY_ENDPOINT?} \
-    -var reverse_proxy_server_ip=${REVERSE_PROXY_SERVER_IP} \
-    -var vpc_network=${VPC_NETWORK} \
-    -var project_id=${PROJECT_ID?} \
-    -var access_token=$(gcloud auth print-access-token) \
-    -var region=${REGION?} google_compute_network.vpc_network projects/vpc-sc-demo-nicholascain15/global/networks/webhook-net
+  # terraform import \
+  #   -var service_directory_namespace=${SERVICE_DIRECTORY_NAMESPACE?} \
+  #   -var service_directory_service=${SERVICE_DIRECTORY_SERVICE?} \
+  #   -var service_directory_endpoint=${SERVICE_DIRECTORY_ENDPOINT?} \
+  #   -var reverse_proxy_server_ip=${REVERSE_PROXY_SERVER_IP} \
+  #   -var vpc_network=${VPC_NETWORK} \
+  #   -var project_id=${PROJECT_ID?} \
+  #   -var access_token=$(gcloud auth print-access-token) \
+  #   -var region=${REGION?} google_compute_network.vpc_network projects/vpc-sc-demo-nicholascain15/global/networks/webhook-net
 
-  import google_compute_network.vpc_network projects/vpc-sc-demo-nicholascain15/global/networks/webhook-net
+  # import google_compute_network.vpc_network projects/vpc-sc-demo-nicholascain15/global/networks/webhook-net
 
 
-  terraform init && terraform apply --auto-approve \
-    -var access_token=$(gcloud auth print-access-token) \
-    -var project_id=${PROJECT_ID?} \
-    -var region=${REGION?} \
-    -var bucket=${PROJECT_ID?}-tf \
-    -var webhook_name=${WEBHOOK_NAME?} \
+  # terraform init && terraform apply --auto-approve \
+  #   -var access_token=$(gcloud auth print-access-token) \
+  #   -var project_id=${PROJECT_ID?} \
+  #   -var region=${REGION?} \
+  #   -var bucket=${PROJECT_ID?}-tf \
+  #   -var webhook_name=${WEBHOOK_NAME?} \
 
-  curl -s -X POST \
-    -H "Authorization: Bearer $(gcloud auth print-access-token)" \
-    -H "Content-Type:application/json" \
-    -H "x-goog-user-project: ${PROJECT_ID?}" \
-    -d \
-    '{
-      "displayName": "Telecommunications",
-      "defaultLanguageCode": "en",
-      "timeZone": "America/Chicago"
-    }' \
-    "https://${REGION?}-dialogflow.googleapis.com/v3/projects/${PROJECT_ID?}/locations/${REGION?}/agents"
+  # curl -s -X POST \
+  #   -H "Authorization: Bearer $(gcloud auth print-access-token)" \
+  #   -H "Content-Type:application/json" \
+  #   -H "x-goog-user-project: ${PROJECT_ID?}" \
+  #   -d \
+  #   '{
+  #     "displayName": "Telecommunications",
+  #     "defaultLanguageCode": "en",
+  #     "timeZone": "America/Chicago"
+  #   }' \
+  #   "https://${REGION?}-dialogflow.googleapis.com/v3/projects/${PROJECT_ID?}/locations/${REGION?}/agents"
 
-  export AGENT_NAME=$(curl -s -X GET -H "Authorization: Bearer $(gcloud auth print-access-token)" \
-    -H "Content-Type:application/json" \
-    -H "x-goog-user-project: ${PROJECT_ID}" \
-    "https://${REGION?}-dialogflow.googleapis.com/v3/projects/${PROJECT_ID?}/locations/${REGION?}/agents" | jq -r '.agents[0].name')
+  # export AGENT_NAME=$(curl -s -X GET -H "Authorization: Bearer $(gcloud auth print-access-token)" \
+  #   -H "Content-Type:application/json" \
+  #   -H "x-goog-user-project: ${PROJECT_ID}" \
+  #   "https://${REGION?}-dialogflow.googleapis.com/v3/projects/${PROJECT_ID?}/locations/${REGION?}/agents" | jq -r '.agents[0].name')
 
-  curl -s -X POST \
-    -H "Authorization: Bearer $(gcloud auth print-access-token)" \
-    -H "Content-Type:application/json" \
-    -H "x-goog-user-project: ${PROJECT_ID?}" \
-    -d \
-    '{
-     "agentUri": "gs://gassets-api-ai/prebuilt_agents/cx-prebuilt-agents/exported_agent_Telecommunications.blob"
-    }' \
-    "https://${REGION?}-dialogflow.googleapis.com/v3/${AGENT_NAME?}:restore"
-  '''
+  # curl -s -X POST \
+  #   -H "Authorization: Bearer $(gcloud auth print-access-token)" \
+  #   -H "Content-Type:application/json" \
+  #   -H "x-goog-user-project: ${PROJECT_ID?}" \
+  #   -d \
+  #   '{
+  #    "agentUri": "gs://gassets-api-ai/prebuilt_agents/cx-prebuilt-agents/exported_agent_Telecommunications.blob"
+  #   }' \
+  #   "https://${REGION?}-dialogflow.googleapis.com/v3/${AGENT_NAME?}:restore"
+
 
 
   # plan_import = {
@@ -1037,3 +1256,166 @@ def update_target():
   #   "google_service_directory_endpoint.reverse_proxy",
   #   "google_dialogflow_cx_agent.full_agent",
   # ]
+
+# @app.route('/update_target', methods=['POST'])
+# def update_target():
+#   token_dict = get_token(request, token_type='access_token')
+#   if 'response' in token_dict:
+#     return token_dict['response']
+#   access_token = token_dict['access_token']
+
+#   target = request.args['target']
+#   content = request.get_json(silent=True)
+#   mode = content['mode']
+
+#   c = context.Context()
+#   module = '/app/deploy/main.tf'
+#   with tempfile.TemporaryDirectory() as workdir:
+#     tf_init(c, access_token=access_token, bucket=TF_PLAN_STORAGE_BUCKET, module=module, workdir=workdir)
+#     tf_plan(c, access_token=access_token, json_output=False, mode='refresh', target=target, workdir=workdir)
+#     tf_apply(c, access_token=access_token, json_output=True, mode=mode, target=target, workdir=workdir)
+#     plan_response = tf_plan(c, access_token=access_token, json_output=True, mode='refresh', target=target, workdir=workdir)
+
+#   if plan_response.get('planned_changes',[]):
+#     status = 500
+#     return Response(status=status, response=json.dumps({'status': "ERROR"}, indent=2))
+#   else:
+#     status = 200
+#     deployed_status = False if mode == 'destroy' else True
+#     return Response(status=status, response=json.dumps({'status': deployed_status}, indent=2))
+
+
+
+# @task
+# def tf_init(c, access_token, bucket, workdir='/app/deploy', prefix='terraform/vpc_sc_demo', module=None, verbose=False):
+#   result = c.run(f'\
+#     cp {module} {workdir} &&\
+#     terraform -chdir={workdir} init')
+#   # promise = c.run(f'\
+#   #   mkdir -p {workdir} &&\
+#   #   cp {module} {workdir} &&\
+#   #   terraform -chdir={workdir} init -get=true -lock=false -upgrade -reconfigure -backend-config="access_token={access_token}" -backend-config="bucket={bucket}" -backend-config="prefix={prefix}"\
+#   # ', warn=True, hide=True, asynchronous=True)
+#   # result = promise.join()
+#   if not (result.exited == 0):
+#     print(result.stdout)
+#     print(result.stderr)
+#   assert result.exited == 0
+
+#   if verbose:
+#     print(result.exited)
+#     print(result.stdout)
+#     print(result.stderr)
+
+
+
+# @task
+# def tf_plan(c, access_token, mode='deploy', json_output=True, target=None, workdir='/app/deploy', verbose=False):
+
+#   target_option = f'-target={target}' if target else ''
+#   json_option = '-json' if json_output==True else '-no-color'
+#   if mode == 'deploy':
+#     destroy_option = ''
+#   elif mode == 'destroy':
+#     destroy_option = '--destroy'
+#   elif mode == 'refresh':
+#     destroy_option = '-refresh-only'
+#   else:
+#     raise RuntimeError(f"Unexpected option for mode: {mode}")
+
+#   promise = c.run(f'\
+#     cd {workdir} &&\
+#     export GOOGLE_OAUTH_ACCESS_TOKEN={access_token} &&\
+#     terraform -chdir={workdir} plan -lock=false -detailed-exitcode -var-file="/app/deploy/testing.tfvars" -var access_token=\'{access_token}\' {json_option} {destroy_option} {target_option} -compact-warnings\
+#   ', warn=True, hide=True, asynchronous=True)
+#   result = promise.join()
+
+#   response = {'stdout': result.stdout, 'stderr':result.stderr}
+#   if json_output:
+#     planned_changes = []
+#     errors = []
+#     lines = result.stdout.split('\n')
+#     for line in lines:
+#       if line.strip():
+#         message = json.loads(line)
+#         if message["@level"] == "error":
+#           app.logger.error(json.dumps(message, indent=2))
+#           errors.append(message)
+#         elif message['type'] == 'planned_change':
+#           planned_changes.append(message['change'])
+#         elif message["@level"] == "info":
+#           pass
+#         elif message['type'] == 'diagnostic' and message['@message'] == 'Warning: Resource targeting is in effect':
+#           pass
+#         elif message['type'] in ['refresh_start', 'refresh_complete']:
+#           pass
+#         else:
+#           print(json.dumps(message, indent=2))
+
+#     response['planned_changes'] = planned_changes
+#     response['errors'] = errors
+
+#   if verbose:
+#     print(result.exited)
+#     print(result.stdout)
+#     print(result.stderr)
+
+#   return response
+
+
+# @task
+# def tf_import(c, access_token, address, resource, workdir = '/app/deploy'):
+#   promise = c.run(f'\
+#     cd {workdir} &&\
+#     export GOOGLE_OAUTH_ACCESS_TOKEN={access_token} &&\
+#     terraform import -var-file="testing.tfvars" "{address}" "{resource}"\
+#   ', warn=True, hide=True, asynchronous=True)
+#   result = promise.join()
+#   print(result.stdout)
+
+
+# @task
+# def tf_apply(c, access_token, mode='deploy', workdir='/app/deploy', target=None, json_output=True, verbose=True):
+
+#   target_option = f'-target={target}' if target else ''
+#   json_option = '-json' if json_output==True else '-no-color'
+#   if mode == 'deploy':
+#     destroy_option = ''
+#   elif mode == 'destroy':
+#     destroy_option = '--destroy'
+#   elif mode == 'refresh':
+#     destroy_option = '-refresh-only'
+#   else:
+#     raise RuntimeError(f"Unexpected option for mode: {mode}")
+
+#   promise = c.run(f'\
+#     cd {workdir} &&\
+#     export GOOGLE_OAUTH_ACCESS_TOKEN={access_token} &&\
+#     terraform -chdir={workdir} apply -lock=false --auto-approve -var-file="/app/deploy/testing.tfvars" -var access_token=\'{access_token}\' {destroy_option} \'{target_option}\' {json_option}  -compact-warnings\
+#   ', warn=True, asynchronous=True)
+#   result = promise.join()
+
+#   if verbose:
+#     print(result.exited)
+#     print(result.stdout)
+#     print(result.stderr)
+
+#   if json_output:
+#     output = []
+#     apply_complete = []
+#     lines = result.stdout.split('\n')
+#     for line in lines:
+#       if line.strip():
+#         message = json.loads(line)
+#         output.append(message)
+#         if message['type'] == 'apply_complete':
+#           apply_complete.append(message)
+#         elif message["@level"] == "error":
+#           app.logger.error(json.dumps(message, indent=2))
+#         else:
+#           pass
+        
+
+#     return {'stdout': output, 'stderr':result.stderr, 'apply_complete':apply_complete}
+#   else:
+#     return {'stdout': result.stdout, 'stderr':result.stderr}
