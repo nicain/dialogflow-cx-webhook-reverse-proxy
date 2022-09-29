@@ -102,6 +102,13 @@ resource "google_project_service" "cloudfunctions" {
   disable_dependent_services = true
 }
 
+resource "google_project_service" "cloudbuild" {
+  service = "cloudbuild.googleapis.com"
+  project            = var.project_id
+  disable_on_destroy = true
+  disable_dependent_services = true
+}
+
 module "services" {
   source = "/app/deploy/terraform/services"
   project_id = var.project_id
@@ -110,6 +117,7 @@ module "services" {
     google_project_service.compute,
     google_project_service.dialogflow,
     google_project_service.cloudfunctions,
+    google_project_service.cloudbuild,
   ]
 }
 
@@ -145,4 +153,5 @@ module "webhook_agent" {
   bucket = var.bucket
   dialogflow_api = google_project_service.dialogflow
   cloudfunctions_api = google_project_service.cloudfunctions
+  cloudbuild_api = google_project_service.cloudbuild
 }

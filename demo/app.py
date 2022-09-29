@@ -849,7 +849,7 @@ def tf_state_list(c, module, workdir, access_token, debug):
       'module.services.google_project_service.accesscontextmanager',
       'module.services.google_project_service.appengine',
       'module.services.google_project_service.artifactregistry',
-      'module.services.google_project_service.cloudbuild',
+      'google_project_service.cloudbuild',
       'module.services.google_project_service.iam',
       'module.services.google_project_service.run',
       'google_project_service.servicedirectory',

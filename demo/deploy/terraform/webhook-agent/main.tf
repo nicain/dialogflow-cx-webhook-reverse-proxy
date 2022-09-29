@@ -36,6 +36,10 @@ variable "cloudfunctions_api" {
   type = object({})
 }
 
+variable "cloudbuild_api" {
+  type = object({})
+}
+
 locals {
 	root_dir = abspath("./")
   archive_path = abspath("./tmp/function.zip")
@@ -62,6 +66,14 @@ resource "google_storage_bucket_object" "archive" {
   depends_on = [data.archive_file.source]
 }
 
+resource "time_sleep" "wait_for_apis" {
+  create_duration = "60s"
+  depends_on = [
+    var.cloudfunctions_api,
+    var.cloudbuild_api
+  ]
+}
+
 resource "google_cloudfunctions_function" "webhook" {
   project = var.project_id
   name        = var.webhook_name
@@ -75,7 +87,7 @@ resource "google_cloudfunctions_function" "webhook" {
   entry_point           = "cxPrebuiltAgentsTelecom"
   region = var.region
   depends_on = [
-    var.cloudfunctions_api
+    time_sleep.wait_for_apis
   ]
 }
 

@@ -17,13 +17,6 @@ resource "google_project_service" "run" {
   disable_dependent_services = true
 }
 
-resource "google_project_service" "cloudbuild" {
-  service = "cloudbuild.googleapis.com"
-  project            = var.project_id
-  disable_on_destroy = true
-  disable_dependent_services = true
-}
-
 resource "google_project_service" "artifactregistry" {
   service = "artifactregistry.googleapis.com"
   project            = var.project_id

@@ -166,7 +166,7 @@ function AssetStatus() {
     "module.services.google_project_service.iam": iamService,
     "google_project_service.servicedirectory": servicedirectoryService,
     "module.services.google_project_service.run": runService,
-    "module.services.google_project_service.cloudbuild": cloudbuildService,
+    "google_project_service.cloudbuild": cloudbuildService,
     "module.services.google_project_service.artifactregistry": artifactregistryService,
     "module.services.google_project_service.accesscontextmanager": accesscontextmanagerService,
     "module.services.google_project_service.vpcaccess": vpcaccessService,
@@ -203,6 +203,7 @@ function DataModel () {
   const activePage = {current: null, set: null};
   const terraformLocked = {current: null, set: null};
   const validProjectId = {current: null, set: null};
+  const invertAssetCollectionSwitches = {current: null, set: null};
 
   const allStates = {};
   allStates["dialogflowRestrictedState"] = getState();
@@ -222,6 +223,7 @@ function DataModel () {
   [activePage.current, activePage.set] = useState(0);
   [terraformLocked.current, terraformLocked.set] = useState(false);
   [validProjectId.current, validProjectId.set] = useState(false);
+  [invertAssetCollectionSwitches.current, invertAssetCollectionSwitches.set] = useState(false);
 
   const dataModel = {
     pageMapper: pageMapper,
@@ -234,6 +236,7 @@ function DataModel () {
     assetStatus: AssetStatus(),
     terraformLocked:terraformLocked,
     validProjectId:validProjectId,
+    invertAssetCollectionSwitches:invertAssetCollectionSwitches,
   }
   return dataModel
 }

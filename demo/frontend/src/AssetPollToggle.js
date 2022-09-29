@@ -109,14 +109,35 @@ function ToggleAsset(props) {
   function onSettled() {
     props.dataModel.terraformLocked.set(false);
     completed.current = true;
+    props.dataModel.invertAssetCollectionSwitches.set(false)
   }
 
+  
   function queryFunction () {
+    var destroy = asset.current === true ? true : false
+    if (props.isModuleSwitch && props.dataModel.invertAssetCollectionSwitches.current) {
+      destroy = !destroy
+    }
+
+    var target;
+    if (props.target==="module.services" && destroy) {
+      target = [
+        props.target, 
+        "google_project_service.dialogflow", 
+        "google_project_service.cloudfunctions",
+        "google_project_service.compute",
+        "google_project_service.servicedirectory",
+        "google_project_service.cloudbuild",
+      ];
+    } else {
+      target = [props.target]
+    }
+
     props.dataModel.terraformLocked.set(true);
     return axios.post("/update_target", 
       {
-        "targets":[props.target],
-        "destroy": asset.current === true ? true : false,
+        "targets":target,
+        "destroy": destroy,
       }, 
       {params: 
         {
@@ -173,16 +194,12 @@ function ToggleAsset(props) {
     tfImport.refetch()
   }
 
-
-
   useEffect(() => {
     if (update.data && completed.current){ 
-
       if (update.data.status==='BLOCKED') {
         console.log(update.data.reason)
       } else {
         completed.current = false;
-        // asset.set(update.data.resources.includes(props.target))
         for (var key in props.dataModel.assetStatus) {
           props.dataModel.assetStatus[key].set(update.data.resources.includes(key))
         }
@@ -190,14 +207,12 @@ function ToggleAsset(props) {
     }
   })
 
-
-
-
-
-
-  
   function onChange() {
-    if (asset.current && props.enableAlert) {
+    var destroy = asset.current === true ? true : false
+    if (props.isModuleSwitch && props.dataModel.invertAssetCollectionSwitches.current) {
+      destroy = !destroy
+    }
+    if (destroy && props.enableAlert) {
       setAlertBoxOpen(true);
     } else {
       update.refetch()
@@ -211,35 +226,19 @@ function ToggleAsset(props) {
   } else {
     visibility = "visible"
   }
+
+
+  var checked = typeof(asset.current) == "boolean" ? asset.current : false
+  if (props.isModuleSwitch && props.dataModel.invertAssetCollectionSwitches.current) {
+    checked = !checked
+  }
   const indicator = <Switch
     onChange={onChange} 
-    checked={typeof(asset.current) == "boolean" ? asset.current : false}
+    checked={checked}
     color="primary"
     style={{visibility: visibility}}
     size={props.target==="all" ? "medium" : "small"}
   />
-
-  // var indicator
-  // if (update.isFetching || tfImport.isFetching || typeof(asset.current) != "boolean") {
-
-  //   if (asset.current==='BLOCKED') {
-  //     indicator =
-  //         <Switch
-  //           checked={typeof(asset.current) == "boolean" ? asset.current : false}
-  //           color="primary"
-  //           style={{visibility: "hidden"}}
-  //         />
-  //   } else {
-  //     indicator = <CircularProgress size={20}/>
-  //   }
-  // } else {
-  //   indicator = <Switch
-  //     onChange={onChange} 
-  //     checked={typeof(asset.current) == "boolean" ? asset.current : false}
-  //     color="primary"
-  //     style={{visibility: props.dataModel.terraformLocked.current ? "hidden" : "visible"}}
-  //   />
-  // }
 
   var name
   if (props.dataModel && props.dataModel.projectData.project_id.current != null) {
@@ -337,10 +336,11 @@ function PollAssetStatus(props) {
 
 function QueryToggleAsset(props) {
   const queryClient = new QueryClient();
+  const {isModuleSwitch=false} = props;
   return (
     <div>
       <QueryClientProvider  client={queryClient}>
-        <ToggleAsset name={props.name} target={props.target} dataModel={props.dataModel} enableAlert={props.enableAlert} includeNameBox={props.includeNameBox}/>
+        <ToggleAsset name={props.name} target={props.target} dataModel={props.dataModel} enableAlert={props.enableAlert} includeNameBox={props.includeNameBox} isModuleSwitch={isModuleSwitch}/>
       </QueryClientProvider>
     </div>
   )
@@ -359,16 +359,6 @@ function QueryPollAssetStatus (props) {
 }
 
 
-// function TogglePollAsset (props) {
-//   return (
-//     <div>
-//       <QueryToggleAsset name={props.name} target={props.target} asset={props.asset} dataModel={props.dataModel} enableAlert={props.enableAlert}/>
-//       <QueryPollAssetStatus name={props.name} target={props.target} asset={props.asset} dataModel={props.dataModel}/>
-//     </div>
-//   )
-// }
-
-
 function ServicesPanel (props) {
   return (
     <>
@@ -376,7 +366,7 @@ function ServicesPanel (props) {
         <Typography variant="h6">
           APIs & Services:
         </Typography> 
-        <QueryToggleAsset target="module.services" dataModel={props.dataModel} enableAlert={true} includeNameBox={true}/>
+        <QueryToggleAsset target="module.services" dataModel={props.dataModel} enableAlert={true} includeNameBox={true} isModuleSwitch={true}/>
       </Grid>
       <Divider sx={{ my:1 }} orientation="horizontal" flexItem/>
       <Grid container  justifyContent="flex-end">
@@ -386,7 +376,7 @@ function ServicesPanel (props) {
         <QueryToggleAsset name="iam.googleapis.com" target="module.services.google_project_service.iam" dataModel={props.dataModel} enableAlert={true}/>
         <QueryToggleAsset name="servicedirectory.googleapis.com" target="google_project_service.servicedirectory" dataModel={props.dataModel} enableAlert={true}/>
         <QueryToggleAsset name="run.googleapis.com" target="module.services.google_project_service.run" dataModel={props.dataModel} enableAlert={true}/>
-        <QueryToggleAsset name="cloudbuild.googleapis.com" target="module.services.google_project_service.cloudbuild" dataModel={props.dataModel} enableAlert={true}/>
+        <QueryToggleAsset name="cloudbuild.googleapis.com" target="google_project_service.cloudbuild" dataModel={props.dataModel} enableAlert={true}/>
         <QueryToggleAsset name="artifactregistry.googleapis.com" target="module.services.google_project_service.artifactregistry" dataModel={props.dataModel} enableAlert={true}/>
         <QueryToggleAsset name="accesscontextmanager.googleapis.com" target="module.services.google_project_service.accesscontextmanager" dataModel={props.dataModel} enableAlert={true}/>
         <QueryToggleAsset name="vpcaccess.googleapis.com" target="module.services.google_project_service.vpcaccess" dataModel={props.dataModel} enableAlert={true}/>
@@ -403,7 +393,7 @@ function NetworkPanel (props) {
         <Typography variant="h6">
           VPC Resources:
         </Typography> 
-        <QueryToggleAsset target="module.vpc_network" dataModel={props.dataModel} enableAlert={false} includeNameBox={true}/>
+        <QueryToggleAsset target="module.vpc_network" dataModel={props.dataModel} enableAlert={false} includeNameBox={true} isModuleSwitch={true}/>
       </Grid>
       <Divider sx={{ my:1 }} orientation="horizontal" flexItem/>
       <Grid container  justifyContent="flex-end">
@@ -427,7 +417,7 @@ function ServiceDirectoryPanel (props) {
         <Typography variant="h6">
         Service Directory:
         </Typography> 
-        <QueryToggleAsset target="module.service_directory" dataModel={props.dataModel} enableAlert={false} includeNameBox={true}/>
+        <QueryToggleAsset target="module.service_directory" dataModel={props.dataModel} enableAlert={false} includeNameBox={true} isModuleSwitch={true}/>
       </Grid>
       <Divider sx={{ my:1 }} orientation="horizontal" flexItem/>
       <Grid container  justifyContent="flex-end">
@@ -446,7 +436,7 @@ function AgentPanel (props) {
         <Typography variant="h6">
         Webhook Agent:
         </Typography> 
-        <QueryToggleAsset target="module.webhook_agent" dataModel={props.dataModel} enableAlert={false} includeNameBox={true}/>
+        <QueryToggleAsset target="module.webhook_agent" dataModel={props.dataModel} enableAlert={false} includeNameBox={true} isModuleSwitch={true}/>
       </Grid>
       <Divider sx={{ my:1 }} orientation="horizontal" flexItem/>
       <Grid container  justifyContent="flex-end">

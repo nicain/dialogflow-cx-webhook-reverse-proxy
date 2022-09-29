@@ -5,6 +5,26 @@ import {SettingsPanel} from './SettingsPanel.js';
 import Divider from '@mui/material/Divider';
 import Typography from '@mui/material/Typography';
 import CircularProgress from '@mui/material/CircularProgress';
+import Checkbox from '@mui/material/Checkbox';
+
+
+function InvertMenuSwitchsCheckbox(props) {
+
+  const stateVar = props.dataModel.invertAssetCollectionSwitches;
+
+  function handleChange () {
+    stateVar.set(!stateVar.current)
+  }
+
+  return (
+    <Checkbox
+      checked={stateVar.current}
+      onChange={handleChange}
+      inputProps={{ 'aria-label': 'controlled' }}
+      sx={props.sx}
+    />
+  );
+}
 
 function AssetStatusPanel(props) {
 
@@ -29,8 +49,14 @@ function AssetStatusPanel(props) {
           <Typography variant="h5">
             GCP Project Resources:
           </Typography> 
-          <QueryToggleAsset target="all" dataModel={props.dataModel} enableAlert={true} includeNameBox={true}/>
-        </Grid>     
+          <QueryToggleAsset target="all" dataModel={props.dataModel} enableAlert={true} includeNameBox={true} isModuleSwitch={true}/>
+        </Grid>   
+        <Grid container direction='row' justifyContent="space-between" alignItems="center">
+          <Typography variant="body1">
+          Invert menu switches:
+          </Typography> 
+          <InvertMenuSwitchsCheckbox dataModel={props.dataModel} sx={{'pr':2}}/>
+        </Grid>
       </Paper>
 
      
