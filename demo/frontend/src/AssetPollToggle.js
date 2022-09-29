@@ -204,27 +204,41 @@ function ToggleAsset(props) {
     }
   }
 
-  var indicator
-  if (update.isFetching || tfImport.isFetching || typeof(asset.current) != "boolean") {
 
-    if (asset.current==='BLOCKED') {
-      indicator =
-          <Switch
-            checked={typeof(asset.current) == "boolean" ? asset.current : false}
-            color="primary"
-            style={{visibility: "hidden"}}
-          />
-    } else {
-      indicator = <CircularProgress size={20}/>
-    }
+  var visibility
+  if (update.isFetching || tfImport.isFetching || typeof(asset.current) != "boolean" || props.dataModel.terraformLocked.current || asset.current==='BLOCKED') {
+    visibility = "hidden"
   } else {
-    indicator = <Switch
-      onChange={onChange} 
-      checked={typeof(asset.current) == "boolean" ? asset.current : false}
-      color="primary"
-      style={{visibility: props.dataModel.terraformLocked.current ? "hidden" : "visible"}}
-    />
+    visibility = "visible"
   }
+  const indicator = <Switch
+    onChange={onChange} 
+    checked={typeof(asset.current) == "boolean" ? asset.current : false}
+    color="primary"
+    style={{visibility: visibility}}
+  />
+
+  // var indicator
+  // if (update.isFetching || tfImport.isFetching || typeof(asset.current) != "boolean") {
+
+  //   if (asset.current==='BLOCKED') {
+  //     indicator =
+  //         <Switch
+  //           checked={typeof(asset.current) == "boolean" ? asset.current : false}
+  //           color="primary"
+  //           style={{visibility: "hidden"}}
+  //         />
+  //   } else {
+  //     indicator = <CircularProgress size={20}/>
+  //   }
+  // } else {
+  //   indicator = <Switch
+  //     onChange={onChange} 
+  //     checked={typeof(asset.current) == "boolean" ? asset.current : false}
+  //     color="primary"
+  //     style={{visibility: props.dataModel.terraformLocked.current ? "hidden" : "visible"}}
+  //   />
+  // }
 
   var name
   if (props.dataModel && props.dataModel.projectData.project_id.current != null) {

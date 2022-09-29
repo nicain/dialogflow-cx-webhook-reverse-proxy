@@ -4,14 +4,25 @@ import Paper from '@mui/material/Paper';
 import {SettingsPanel} from './SettingsPanel.js';
 import Divider from '@mui/material/Divider';
 import Typography from '@mui/material/Typography';
+import CircularProgress from '@mui/material/CircularProgress';
 
 function AssetStatusPanel(props) {
+
+  const TerraformLockedSpinner = props.dataModel.terraformLocked.current ? <CircularProgress size={100} thickness={10}/> : <></>
+
   return (
     <>
+      <Grid container direction='row' alignItems="center" columnSpacing={4}>
+      <Grid item>
       <SettingsPanel dataModel={props.dataModel}/>
+      </Grid>
+      <Grid item>
+          {TerraformLockedSpinner}
+      </Grid>
+      </Grid>
+
       <Divider sx={{ my:2 }} orientation="horizontal" flexItem/>
       <QueryPollAssetStatus dataModel={props.dataModel}/>
-
 
       <Paper variant="string" sx={{width: 370, px:1, py:1, my:1}}>
         <Grid container direction='row' justifyContent="space-between">
@@ -22,6 +33,7 @@ function AssetStatusPanel(props) {
         </Grid>     
       </Paper>
 
+     
 
       <Grid container direction='row' columnSpacing={3} justifyContent="flex-start" alignItems="top">
         <Grid item>
