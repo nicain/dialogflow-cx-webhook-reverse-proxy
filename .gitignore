@@ -12,3 +12,4 @@ launch
 plan.out
 terraform.tfstate
 terraform.tfstate.backup
+**/plugin-cache

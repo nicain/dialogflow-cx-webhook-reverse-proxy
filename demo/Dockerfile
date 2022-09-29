@@ -37,6 +37,8 @@ COPY app.py /app/app.py
 
 RUN mkdir -p /app/deploy/.terraform.d/plugin-cache
 COPY deploy/.terraformrc /root
+COPY deploy/terraform /app/deploy/terraform
+COPY deploy/webhook-src /app/deploy/webhook-src/
 
 EXPOSE 8080
 CMD exec gunicorn --bind=0.0.0.0:8080 --workers=1 --threads=8 --log-level=info app:app

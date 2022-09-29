@@ -48,11 +48,11 @@ function ErrorDialog(props) {
   if (props.error && props.error.response.data.errors[0]==="Error: Error acquiring the state lock") {
     console.log("Error acquiring the state lock")
   } else if (props.error) {
-    if (props.target==="google_compute_router_nat.nat_manual") {
+    if (props.target==="module.vpc_network.google_compute_router_nat.nat_manual") {
       props.setResourceName(`'projects/${props.dataModel.projectData.project_id.current}/regions/${props.dataModel.projectData.region.current}/routers/nat-router/nat-config'`)
-    } else if (props.target==="google_service_directory_service.reverse_proxy") {
+    } else if (props.target==="module.service_directory.google_service_directory_service.reverse_proxy") {
       props.setResourceName(`'projects/${props.dataModel.projectData.project_id.current}/locations/${props.dataModel.projectData.region.current}/namespaces/df-namespace/services/df-service'`)
-    } else if (props.target==="google_service_directory_endpoint.reverse_proxy") {
+    } else if (props.target==="module.service_directory.google_service_directory_endpoint.reverse_proxy") {
       props.setResourceName(`'projects/${props.dataModel.projectData.project_id.current}/locations/${props.dataModel.projectData.region.current}/namespaces/df-namespace/services/df-service/endpoints/df-endpoint'`)
     } else {
       props.setResourceName(props.error.response.data.errors[0]["diagnostic"]["summary"])
@@ -182,11 +182,20 @@ function ToggleAsset(props) {
         console.log(update.data.reason)
       } else {
         completed.current = false;
-        asset.set(update.data.resources.includes(props.target))
+        // asset.set(update.data.resources.includes(props.target))
+        for (var key in props.dataModel.assetStatus) {
+          props.dataModel.assetStatus[key].set(update.data.resources.includes(key))
+        }
       }
     }
   })
 
+
+
+
+
+
+  
   function onChange() {
     if (asset.current && props.enableAlert) {
       setAlertBoxOpen(true);
@@ -225,6 +234,15 @@ function ToggleAsset(props) {
     name = <Typography variant="body2">{props.name}</Typography>;
   }
 
+  var nameBox = (        
+    <Box sx={{ pl:1, mx:0, my: .5, py:1, width: 300, height: 30  }}         
+      display="flex" 
+      alignItems="center"
+      justifyContent="right">
+      {name}
+    </Box>
+  )
+
   return (
     <>
       <AlertDialog 
@@ -243,12 +261,7 @@ function ToggleAsset(props) {
         error={update.error}
         dataModel={props.dataModel}/>
       <Grid container item direction='row' columnSpacing={3} justifyContent="flex-start" alignItems="center">
-        <Box sx={{ pl:1, mx:0, my: .5, py:1, width: 300, height: 30  }}         
-          display="flex" 
-          alignItems="center"
-          justifyContent="right">
-          {name}
-        </Box>
+        {props.includeNameBox? <></>: nameBox}
         <Box sx={{ width: 60, height: 30  }}         
           display="flex" 
           alignItems="center"
@@ -287,6 +300,7 @@ function PollAssetStatus(props) {
       refetchInterval: (props.dataModel.terraformLocked.current? false : 600000),
       onSettled: onSettled,
       retry: false,
+      enabled: typeof(props.dataModel.validProjectId.current) == "boolean" ? props.dataModel.validProjectId.current : false
     }
   );
 
@@ -311,7 +325,7 @@ function QueryToggleAsset(props) {
   return (
     <div>
       <QueryClientProvider  client={queryClient}>
-        <ToggleAsset name={props.name} target={props.target} dataModel={props.dataModel} enableAlert={props.enableAlert}/>
+        <ToggleAsset name={props.name} target={props.target} dataModel={props.dataModel} enableAlert={props.enableAlert} includeNameBox={props.includeNameBox}/>
       </QueryClientProvider>
     </div>
   )
@@ -343,21 +357,25 @@ function QueryPollAssetStatus (props) {
 function ServicesPanel (props) {
   return (
     <>
-      <Typography variant="h6">
-        APIs & Services:
-      </Typography>
+      <Grid container direction='row' justifyContent="space-between">
+        <Typography variant="h6">
+          APIs & Services:
+        </Typography> 
+        <QueryToggleAsset target="module.services" dataModel={props.dataModel} enableAlert={true} includeNameBox={true}/>
+      </Grid>
+      <Divider sx={{ my:1 }} orientation="horizontal" flexItem/>
       <Grid container  justifyContent="flex-end">
         <QueryToggleAsset name="dialogflow.googleapis.com" target="google_project_service.dialogflow" dataModel={props.dataModel} enableAlert={true}/>
         <QueryToggleAsset name="cloudfunctions.googleapis.com" target="google_project_service.cloudfunctions" dataModel={props.dataModel} enableAlert={true}/>
         <QueryToggleAsset name="compute.googleapis.com" target="google_project_service.compute" dataModel={props.dataModel} enableAlert={true}/>
-        <QueryToggleAsset name="iam.googleapis.com" target="google_project_service.iam" dataModel={props.dataModel} enableAlert={true}/>
+        <QueryToggleAsset name="iam.googleapis.com" target="module.services.google_project_service.iam" dataModel={props.dataModel} enableAlert={true}/>
         <QueryToggleAsset name="servicedirectory.googleapis.com" target="google_project_service.servicedirectory" dataModel={props.dataModel} enableAlert={true}/>
-        <QueryToggleAsset name="run.googleapis.com" target="google_project_service.run" dataModel={props.dataModel} enableAlert={true}/>
-        <QueryToggleAsset name="cloudbuild.googleapis.com" target="google_project_service.cloudbuild" dataModel={props.dataModel} enableAlert={true}/>
-        <QueryToggleAsset name="artifactregistry.googleapis.com" target="google_project_service.artifactregistry" dataModel={props.dataModel} enableAlert={true}/>
-        <QueryToggleAsset name="accesscontextmanager.googleapis.com" target="google_project_service.accesscontextmanager" dataModel={props.dataModel} enableAlert={true}/>
-        <QueryToggleAsset name="vpcaccess.googleapis.com" target="google_project_service.vpcaccess" dataModel={props.dataModel} enableAlert={true}/>
-        <QueryToggleAsset name="appengine.googleapis.com" target="google_project_service.appengine" dataModel={props.dataModel} enableAlert={true}/>
+        <QueryToggleAsset name="run.googleapis.com" target="module.services.google_project_service.run" dataModel={props.dataModel} enableAlert={true}/>
+        <QueryToggleAsset name="cloudbuild.googleapis.com" target="module.services.google_project_service.cloudbuild" dataModel={props.dataModel} enableAlert={true}/>
+        <QueryToggleAsset name="artifactregistry.googleapis.com" target="module.services.google_project_service.artifactregistry" dataModel={props.dataModel} enableAlert={true}/>
+        <QueryToggleAsset name="accesscontextmanager.googleapis.com" target="module.services.google_project_service.accesscontextmanager" dataModel={props.dataModel} enableAlert={true}/>
+        <QueryToggleAsset name="vpcaccess.googleapis.com" target="module.services.google_project_service.vpcaccess" dataModel={props.dataModel} enableAlert={true}/>
+        <QueryToggleAsset name="appengine.googleapis.com" target="module.services.google_project_service.appengine" dataModel={props.dataModel} enableAlert={true}/>
       </Grid>
     </>
   )
@@ -366,26 +384,41 @@ function ServicesPanel (props) {
 function NetworkPanel (props) {
   return (
     <>
-      <Typography variant="h6">
-        VPC Resources:
-      </Typography>
-      <Grid container  justifyContent="flex-end">
-        <QueryToggleAsset name="VPC network" target="google_compute_network.vpc_network" dataModel={props.dataModel} enableAlert={false}/>
-        <QueryToggleAsset name="VPC subnetwork" target="google_compute_subnetwork.reverse_proxy_subnetwork" dataModel={props.dataModel} enableAlert={false}/>
-        <QueryToggleAsset name="Router" target="google_compute_router.nat_router" dataModel={props.dataModel} enableAlert={false}/>
-        <QueryToggleAsset name="Router NAT" target="google_compute_router_nat.nat_manual" dataModel={props.dataModel} enableAlert={false}/>
-        <QueryToggleAsset name="Firewall: Allow General" target="google_compute_firewall.allow_dialogflow" dataModel={props.dataModel} enableAlert={false}/>
-        <QueryToggleAsset name="Firewall: Allow Dialogflow" target="google_compute_firewall.allow" dataModel={props.dataModel} enableAlert={false}/>
-        <QueryToggleAsset name="Address" target="google_compute_address.reverse_proxy_address" dataModel={props.dataModel} enableAlert={false}/>
+      <Grid container direction='row' justifyContent="space-between">
+        <Typography variant="h6">
+          VPC Resources:
+        </Typography> 
+        <QueryToggleAsset target="module.vpc_network" dataModel={props.dataModel} enableAlert={false} includeNameBox={true}/>
       </Grid>
-      <Divider sx={{ my:0 }} orientation="horizontal" flexItem/>
-      <Typography variant="h6">
-        Proxy Service:
-      </Typography>
+      <Divider sx={{ my:1 }} orientation="horizontal" flexItem/>
       <Grid container  justifyContent="flex-end">
-        <QueryToggleAsset name="Namespace" target="google_service_directory_namespace.reverse_proxy" dataModel={props.dataModel} enableAlert={false}/>
-        <QueryToggleAsset name="Service" target="google_service_directory_service.reverse_proxy" dataModel={props.dataModel} enableAlert={false}/>
-        <QueryToggleAsset name="Endpoint" target="google_service_directory_endpoint.reverse_proxy" dataModel={props.dataModel} enableAlert={false}/>
+        <QueryToggleAsset name="VPC network" target="module.vpc_network.google_compute_network.vpc_network" dataModel={props.dataModel} enableAlert={false}/>
+        <QueryToggleAsset name="VPC subnetwork" target="module.vpc_network.google_compute_subnetwork.reverse_proxy_subnetwork" dataModel={props.dataModel} enableAlert={false}/>
+        <QueryToggleAsset name="Router" target="module.vpc_network.google_compute_router.nat_router" dataModel={props.dataModel} enableAlert={false}/>
+        <QueryToggleAsset name="Router NAT" target="module.vpc_network.google_compute_router_nat.nat_manual" dataModel={props.dataModel} enableAlert={false}/>
+        <QueryToggleAsset name="Firewall: Allow General" target="module.vpc_network.google_compute_firewall.allow_dialogflow" dataModel={props.dataModel} enableAlert={false}/>
+        <QueryToggleAsset name="Firewall: Allow Dialogflow" target="module.vpc_network.google_compute_firewall.allow" dataModel={props.dataModel} enableAlert={false}/>
+        <QueryToggleAsset name="Address" target="module.vpc_network.google_compute_address.reverse_proxy_address" dataModel={props.dataModel} enableAlert={false}/>
+      </Grid>
+    </>
+  )
+}
+
+
+function ServiceDirectoryPanel (props) {
+  return (
+    <>
+      <Grid container direction='row' justifyContent="space-between">
+        <Typography variant="h6">
+        Service Directory:
+        </Typography> 
+        <QueryToggleAsset target="module.service_directory" dataModel={props.dataModel} enableAlert={false} includeNameBox={true}/>
+      </Grid>
+      <Divider sx={{ my:1 }} orientation="horizontal" flexItem/>
+      <Grid container  justifyContent="flex-end">
+        <QueryToggleAsset name="Namespace" target="module.service_directory.google_service_directory_namespace.reverse_proxy" dataModel={props.dataModel} enableAlert={false}/>
+        <QueryToggleAsset name="Service" target="module.service_directory.google_service_directory_service.reverse_proxy" dataModel={props.dataModel} enableAlert={false}/>
+        <QueryToggleAsset name="Endpoint" target="module.service_directory.google_service_directory_endpoint.reverse_proxy" dataModel={props.dataModel} enableAlert={false}/>
       </Grid>
     </>
   )
@@ -394,15 +427,22 @@ function NetworkPanel (props) {
 function AgentPanel (props) {
   return (
     <>
-      <Typography variant="h6">
+      <Grid container direction='row' justifyContent="space-between">
+        <Typography variant="h6">
         Webhook Agent:
-      </Typography>
+        </Typography> 
+        <QueryToggleAsset target="module.webhook_agent" dataModel={props.dataModel} enableAlert={false} includeNameBox={true}/>
+      </Grid>
       <Divider sx={{ my:1 }} orientation="horizontal" flexItem/>
-      {/* <Grid container  justifyContent="flex-end">
-        <QueryToggleAsset name="Namespace" target="google_service_directory_namespace.reverse_proxy" dataModel={props.dataModel} enableAlert={false}/>
-        <QueryToggleAsset name="Service" target="google_service_directory_service.reverse_proxy" dataModel={props.dataModel} enableAlert={false}/>
-        <QueryToggleAsset name="Endpoint" target="google_service_directory_endpoint.reverse_proxy" dataModel={props.dataModel} enableAlert={false}/>
-      </Grid> */}
+      <Grid container  justifyContent="flex-end">
+        <QueryToggleAsset name="Storage Bucket" target="module.webhook_agent.google_storage_bucket.bucket" dataModel={props.dataModel} enableAlert={false}/>
+        <QueryToggleAsset name="Webhook Source Code" target="module.webhook_agent.google_storage_bucket_object.archive" dataModel={props.dataModel} enableAlert={false}/>
+        <QueryToggleAsset name="Webhook Function" target="module.webhook_agent.google_cloudfunctions_function.webhook" dataModel={props.dataModel} enableAlert={false}/>
+        <QueryToggleAsset name="Dialogflow Agent" target="module.webhook_agent.google_dialogflow_cx_agent.full_agent" dataModel={props.dataModel} enableAlert={false}/>
+      </Grid>
+
+      
+
     </>
   )
 }
@@ -412,7 +452,7 @@ function AgentPanel (props) {
 
 
 
-export {ServicesPanel, NetworkPanel, AgentPanel, QueryPollAssetStatus}
+export {ServicesPanel, NetworkPanel, AgentPanel, QueryPollAssetStatus, QueryToggleAsset, ServiceDirectoryPanel}
 
 
 

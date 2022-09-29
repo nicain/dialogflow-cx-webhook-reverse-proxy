@@ -111,6 +111,20 @@ function AssetStatus() {
   const proxyService = {current: null, set:null};
   const proxyEndpoint = {current: null, set:null};
   const proxyAddress = {current: null, set:null};
+  const networkModule = {current: null, set:null};
+  const servicesModule = {current: null, set:null};
+  const serviceDirectoryModule = {current: null, set:null};
+  const webhookAgentModule = {current: null, set:null};
+  const storageBucket = {current: null, set:null};
+  const webhookArchive = {current: null, set:null};
+  const webhookFunction = {current: null, set:null};
+  const webhookAgent = {current: null, set:null};
+  const allAssets = {current: null, set:null};
+
+  
+  
+  
+
 
   [cloudfunctionService.current, cloudfunctionService.set] = useState(null);
   [dialogflowService.current, dialogflowService.set] = useState(null);
@@ -133,31 +147,51 @@ function AssetStatus() {
   [proxyService.current, proxyService.set] = useState(null);
   [proxyEndpoint.current, proxyEndpoint.set] = useState(null);
   [proxyAddress.current, proxyAddress.set] = useState(null);
+  [networkModule.current, networkModule.set] = useState(null);
+  [servicesModule.current, servicesModule.set] = useState(null);
+  [serviceDirectoryModule.current, serviceDirectoryModule.set] = useState(null);
+  [webhookAgentModule.current, webhookAgentModule.set] = useState(null);
+  [storageBucket.current, storageBucket.set] = useState(null);
+  [webhookArchive.current, webhookArchive.set] = useState(null);
+  [webhookFunction.current, webhookFunction.set] = useState(null);
+  [webhookAgent.current, webhookAgent.set] = useState(null);
+  [allAssets.current, allAssets.set] = useState(null);
 
 
   return {
+    "module.services": servicesModule,
     "google_project_service.cloudfunctions": cloudfunctionService,
     "google_project_service.dialogflow": dialogflowService,
     "google_project_service.compute": computeService,
-    "google_project_service.iam": iamService,
+    "module.services.google_project_service.iam": iamService,
     "google_project_service.servicedirectory": servicedirectoryService,
-    "google_project_service.run": runService,
-    "google_project_service.cloudbuild": cloudbuildService,
-    "google_project_service.artifactregistry": artifactregistryService,
-    "google_project_service.accesscontextmanager": accesscontextmanagerService,
-    "google_project_service.vpcaccess": vpcaccessService,
-    "google_project_service.appengine": appengineService,
-    "google_compute_network.vpc_network": network,
-    "google_compute_subnetwork.reverse_proxy_subnetwork": subNetwork,
-    "google_compute_router.nat_router": natRouter,
-    "google_compute_router_nat.nat_manual": natManual,
-    "google_compute_firewall.allow_dialogflow": firewallDialogflow,
-    "google_compute_firewall.allow": firewallAllow,
-    "google_compute_address.reverse_proxy_address": proxyAddress,
-    "google_service_directory_namespace.reverse_proxy": proxyNamespace,
-    "google_service_directory_service.reverse_proxy": proxyService,
-    "google_service_directory_endpoint.reverse_proxy": proxyEndpoint,
+    "module.services.google_project_service.run": runService,
+    "module.services.google_project_service.cloudbuild": cloudbuildService,
+    "module.services.google_project_service.artifactregistry": artifactregistryService,
+    "module.services.google_project_service.accesscontextmanager": accesscontextmanagerService,
+    "module.services.google_project_service.vpcaccess": vpcaccessService,
+    "module.services.google_project_service.appengine": appengineService,
+    "module.vpc_network": networkModule,
+    "module.vpc_network.google_compute_network.vpc_network": network,
+    "module.vpc_network.google_compute_subnetwork.reverse_proxy_subnetwork": subNetwork,
+    "module.vpc_network.google_compute_router.nat_router": natRouter,
+    "module.vpc_network.google_compute_router_nat.nat_manual": natManual,
+    "module.vpc_network.google_compute_firewall.allow_dialogflow": firewallDialogflow,
+    "module.vpc_network.google_compute_firewall.allow": firewallAllow,
+    "module.vpc_network.google_compute_address.reverse_proxy_address": proxyAddress,
+    "module.service_directory": serviceDirectoryModule,
+    "module.service_directory.google_service_directory_namespace.reverse_proxy": proxyNamespace,
+    "module.service_directory.google_service_directory_service.reverse_proxy": proxyService,
+    "module.service_directory.google_service_directory_endpoint.reverse_proxy": proxyEndpoint,
+    "module.webhook_agent": webhookAgentModule,
+    "module.webhook_agent.google_storage_bucket.bucket": storageBucket,
+    "module.webhook_agent.google_storage_bucket_object.archive": webhookArchive,
+    "module.webhook_agent.google_cloudfunctions_function.webhook": webhookFunction,
+    "module.webhook_agent.google_dialogflow_cx_agent.full_agent": webhookAgent,
+    "all": allAssets,
   }
+
+  
 
 }
 

@@ -27,7 +27,8 @@ function GetPrincipal(props) {
   var tooltipTitle
   var button
   var href
-  if (principal === "" || principal===null) {
+  // console.log(principal)
+  if (principal==="" || principal===null || principal === undefined) {
     tooltipTitle = 'Login'
     button = <Login/>
     href = `http://${window.location.host}/session`
