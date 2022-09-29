@@ -27,21 +27,23 @@ function GetPrincipal(props) {
   var tooltipTitle
   var button
   var href
-  // console.log(principal)
+  var loginEnabled
   if (principal==="" || principal===null || principal === undefined) {
     tooltipTitle = 'Login'
     button = <Login/>
     href = `http://${window.location.host}/session`
+    loginEnabled = true
   } else {
     tooltipTitle = 'Logout'
     button = <Logout/>
     href = `http://${window.location.host}/logout`
+    loginEnabled = false
   }
 
   return (
   <div>
     <TextField 
-      sx={props.sx ? props.sx: {mx:2, width: 350}} 
+      sx={{mx:2, width: 350, color: 'red'}}
       label={"Principal"} 
       variant="outlined" 
       value={principal} 
@@ -49,6 +51,7 @@ function GetPrincipal(props) {
       disabled={true}
 
       InputProps={{
+        style: { "backgroundColor": loginEnabled ? "#ffcdd2" : "transparent" },
         endAdornment: (
           <Tooltip title={tooltipTitle} disableInteractive arrow placement="right">
             <InputAdornment position="end">

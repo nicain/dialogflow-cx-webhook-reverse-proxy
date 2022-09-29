@@ -216,6 +216,7 @@ function ToggleAsset(props) {
     checked={typeof(asset.current) == "boolean" ? asset.current : false}
     color="primary"
     style={{visibility: visibility}}
+    size={props.target==="all" ? "medium" : "small"}
   />
 
   // var indicator
