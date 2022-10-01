@@ -19,42 +19,6 @@ const Item = styled(Paper)(({ theme }) => ({
 }));
 
 
-// function Foo() {
-
-//   const [anchorEl, setAnchorEl] = useState(null);
-//   const handleClick = (event) => {
-//     setAnchorEl(event.currentTarget);
-//   };
-
-//   const handleClose = () => {
-//     setAnchorEl(null);
-//   };
-
-//   const open = Boolean(anchorEl);
-//   const id = open ? 'simple-popover' : undefined;
-
-//   return (
-//     <div>
-//       <Button aria-describedby={id} variant="contained" onClick={handleClick} startIcon={<Terminal />} sx={{ p: 1 }}>
-//         Try it!
-//       </Button>
-//       <Popover
-//         id={id}
-//         open={open}
-//         anchorEl={anchorEl}
-//         onClose={handleClose}
-//         anchorOrigin={{
-//           vertical: 'center',
-//           horizontal: 'right',
-//         }}
-//       >
-//         <Typography sx={{ p: 2 }}>The content of the Popover.</Typography>
-//       </Popover>
-//     </div>
-//   );
-
-// }
-
 
 function getControlElem(title, state, timeout, blocked_by_timeout, queryEndpoint, toggleEndpoint, blocked_by, liveMode, dataModel, pageMapper, pageNumber) { 
 
@@ -71,16 +35,21 @@ function getControlElem(title, state, timeout, blocked_by_timeout, queryEndpoint
   }
 
   return (
-  <Grid container item direction='row' columnSpacing={3} justifyContent="flex-start" alignItems="center">
-    <Box sx={{ width: 270 }}>
-      <Item sx={{my: 0}} variant="string">{title}</Item>
-    </Box>
-    <Box sx={{ width: 60 }}>
-      <Item sx={{my: 0}} variant="string">{statusElem}</Item>
-    </Box>
-    <Item sx={{my: 0}} variant="string">{toggleStatusElem}</Item>
-  </Grid>
-)}
+    <Grid container direction='row' columnSpacing={3} alignItems="center">
+      <Grid item>
+        <Item sx={{my: 0}} variant="string">{toggleStatusElem}</Item>
+      </Grid>
+      <Grid item sx={{ width: 320 }}>
+        <Typography variant="body1" align="right">
+          {title}
+        </Typography> 
+      </Grid>
+      <Grid item>
+        {statusElem}
+      </Grid>
+    </Grid>
+  )
+}
 
 function StateChangeButtonGrid(props){  
 
@@ -95,39 +64,49 @@ function StateChangeButtonGrid(props){
   let dataModel = props.dataModel
 
   return (
-  <Box sx={{ width: "75%", mx: "auto"}}>
-    <Grid container direction='column' rowSpacing={1}>
-      {getControlElem("Webhook Access Authenticated Only?",
-        webhookAccessState, 3, 110,
-        "/webhook_access_allow_unauthenticated_status", 
-        "/update_webhook_access", 
-        cloudfunctionsRestrictedState, liveMode, dataModel, pageMapper, pageNumber)}
+    <>
+      <Grid container direction='column' rowSpacing={1}>
+        {/* <Grid item>
+          {getControlElem("Webhook Access Authenticated Only?",
+            webhookAccessState, 3, 110,
+            "/webhook_access_allow_unauthenticated_status", 
+            "/update_webhook_access", 
+            cloudfunctionsRestrictedState, liveMode, dataModel, pageMapper, pageNumber)}
+        </Grid>
+        
+        <Grid item>
+        {getControlElem("Webhook Allow Internal Ingress Only?",
+          webhookIngressState, 85, 110,
+          "/webhook_ingress_internal_only_status", 
+          "/update_webhook_ingress", 
+          cloudfunctionsRestrictedState, liveMode, dataModel, pageMapper, pageNumber)}
+        </Grid> */}
 
-      {getControlElem("Webhook Allow Internal Ingress Only?",
-        webhookIngressState, 85, 110,
-        "/webhook_ingress_internal_only_status", 
-        "/update_webhook_ingress", 
-        cloudfunctionsRestrictedState, liveMode, dataModel, pageMapper, pageNumber)}
+        <Grid item>
+        {getControlElem("Restrict Cloudfunctions Access to VPC?",
+          cloudfunctionsRestrictedState, 15, null,
+          "/restricted_services_status_cloudfunctions", 
+          "/update_security_perimeter_cloudfunctions", 
+          null, liveMode, dataModel, pageMapper, pageNumber)}
+        </Grid>
 
-      {getControlElem("Restrict Cloudfunctions Access to VPC?",
-        cloudfunctionsRestrictedState, 15, null,
-        "/restricted_services_status_cloudfunctions", 
-        "/update_security_perimeter_cloudfunctions", 
-        null, liveMode, dataModel, pageMapper, pageNumber)}
+        {/* <Grid item>
+        {getControlElem("Restrict Dialogflow Access to VPC?",
+          dialogflowRestrictedState, 15, null,
+          "/restricted_services_status_dialogflow", 
+          "/update_security_perimeter_dialogflow", 
+          null, liveMode, dataModel, pageMapper, pageNumber)}
+        </Grid> */}
 
-      {getControlElem("Restrict Dialogflow Access to VPC?",
-        dialogflowRestrictedState, 15, null,
-        "/restricted_services_status_dialogflow", 
-        "/update_security_perimeter_dialogflow", 
-        null, liveMode, dataModel, pageMapper, pageNumber)}
-
-      {getControlElem("Route Dialogflow Through VPC Proxy?",
-        serviceDirectoryWebhookState, 8, 110,
-        "/service_directory_webhook_fulfillment_status", 
-        "/update_service_directory_webhook_fulfillment", 
-        dialogflowRestrictedState, liveMode, dataModel, pageMapper, pageNumber)}
-    </Grid>
-  </Box>
+        {/* <Grid item>
+        {getControlElem("Route Dialogflow Through VPC Proxy?",
+          serviceDirectoryWebhookState, 8, 110,
+          "/service_directory_webhook_fulfillment_status", 
+          "/update_service_directory_webhook_fulfillment", 
+          dialogflowRestrictedState, liveMode, dataModel, pageMapper, pageNumber)}
+        </Grid> */}
+      </Grid>
+    </>
 )}
 
 export {StateChangeButtonGrid}

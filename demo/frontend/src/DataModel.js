@@ -120,6 +120,9 @@ function AssetStatus() {
   const webhookFunction = {current: null, set:null};
   const webhookAgent = {current: null, set:null};
   const allAssets = {current: null, set:null};
+  const servicePerimeterModule = {current: null, set:null};
+  const accessPolicy = {current: null, set:null};
+  const servicePerimeter = {current: null, set:null};
 
   
   
@@ -156,6 +159,9 @@ function AssetStatus() {
   [webhookFunction.current, webhookFunction.set] = useState(null);
   [webhookAgent.current, webhookAgent.set] = useState(null);
   [allAssets.current, allAssets.set] = useState(null);
+  [servicePerimeterModule.current, servicePerimeterModule.set] = useState(null);
+  [accessPolicy.current, accessPolicy.set] = useState(null);
+  [servicePerimeter.current, servicePerimeter.set] = useState(null);
 
 
   return {
@@ -168,7 +174,7 @@ function AssetStatus() {
     "module.services.google_project_service.run": runService,
     "google_project_service.cloudbuild": cloudbuildService,
     "module.services.google_project_service.artifactregistry": artifactregistryService,
-    "module.services.google_project_service.accesscontextmanager": accesscontextmanagerService,
+    "google_project_service.accesscontextmanager": accesscontextmanagerService,
     "module.services.google_project_service.vpcaccess": vpcaccessService,
     "module.services.google_project_service.appengine": appengineService,
     "module.vpc_network": networkModule,
@@ -188,6 +194,9 @@ function AssetStatus() {
     "module.webhook_agent.google_storage_bucket_object.archive": webhookArchive,
     "module.webhook_agent.google_cloudfunctions_function.webhook": webhookFunction,
     "module.webhook_agent.google_dialogflow_cx_agent.full_agent": webhookAgent,
+    "module.service_perimeter": servicePerimeterModule,
+    "module.service_perimeter.google_access_context_manager_access_policy.access-policy":accessPolicy,
+    "module.service_perimeter.google_access_context_manager_service_perimeter.service-perimeter":servicePerimeter,
     "all": allAssets,
   }
 
@@ -204,6 +213,8 @@ function DataModel () {
   const terraformLocked = {current: null, set: null};
   const validProjectId = {current: null, set: null};
   const invertAssetCollectionSwitches = {current: null, set: null};
+  const showServicesPanel = {current: null, set: null};
+  const sessionExpiredModalOpen = {current: null, set: null};
 
   const allStates = {};
   allStates["dialogflowRestrictedState"] = getState();
@@ -224,6 +235,8 @@ function DataModel () {
   [terraformLocked.current, terraformLocked.set] = useState(false);
   [validProjectId.current, validProjectId.set] = useState(false);
   [invertAssetCollectionSwitches.current, invertAssetCollectionSwitches.set] = useState(false);
+  [showServicesPanel.current, showServicesPanel.set] = useState(false);
+  [sessionExpiredModalOpen.current, sessionExpiredModalOpen.set] = useState(false);
 
   const dataModel = {
     pageMapper: pageMapper,
@@ -237,6 +250,8 @@ function DataModel () {
     terraformLocked:terraformLocked,
     validProjectId:validProjectId,
     invertAssetCollectionSwitches:invertAssetCollectionSwitches,
+    showServicesPanel:showServicesPanel,
+    sessionExpiredModalOpen:sessionExpiredModalOpen,
   }
   return dataModel
 }

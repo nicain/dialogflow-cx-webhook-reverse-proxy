@@ -27,8 +27,6 @@ PROD = os.getenv("PROD") == 'true'
 app = Flask(__name__, static_folder='frontend/build')
 app.logger.setLevel(logging.INFO)
 
-with open('principal.env', 'r') as f:
-  PRINCIPAL = f.read().strip()
 
 def user_service_domain(request):
   if request.host_url in ['http://localhost:5001/', 'http://localhost:8081/']:
@@ -53,17 +51,10 @@ def login_landing_uri(request):
   app.logger.info(f'login_landing_uri(request): landing_uri="{landing_uri}"')
   return landing_uri
 
-
-
-authorized_emails = [
-  PRINCIPAL,
-]
-
 AUTH_SERVICE_HOSTNAME = 'authentication-service-moxl25afhq-uc.a.run.app'
 AUTH_SERVICE_AUTH_ENDPOINT = f'http://{AUTH_SERVICE_HOSTNAME}/auth'
 AUTH_SERVICE_VERIFY_AUD_ENDPOINT = f'http://{AUTH_SERVICE_HOSTNAME}/verify_aud'
 AUTH_SERVICE_LOGIN_ENDPOINT = f'http://{AUTH_SERVICE_HOSTNAME}/login'
-PING_WEBHOOK_EXTERNAL_PROXY_ENDPOINT = f'http://{AUTH_SERVICE_HOSTNAME}/ping_webhook_external_proxy'
 
 TF_PLAN_STORAGE_BUCKET = 'vpc-sc-demo-nicholascain15-tf'
 
@@ -211,12 +202,15 @@ def get_service_perimeter_data_uri(token, project_id):
   headers['Authorization'] = f'Bearer {token}'
   r = requests.get(f'https://accesscontextmanager.googleapis.com/v1/accessPolicies/{access_policy_id}/servicePerimeters', headers=headers)
   if r.status_code != 200:
-    app.logger.info(f'  accesscontextmanager API rejected request: {r.text}')
+    if (r.json()['error']['status'] == 'PERMISSION_DENIED') and (r.json()['error']['message'].startswith('Access Context Manager API has not been used in project')):
+      response = Response(status=200, response=json.dumps({'status':'BLOCKED', 'reason':'ACCESS_CONTEXT_MANAGER_API_DISABLED'}))
+      return {'response':response}
     if r.json()['error']['status'] == 'PERMISSION_DENIED':
       response = Response(status=200, response=json.dumps({'status':'BLOCKED', 'reason':'PERMISSION_DENIED'}))
       return {'response':response}
     else:
-      response = Response(status=r.status_code, response=r.text)
+      app.logger.info(f'  accesscontextmanager API rejected request: {r.text}')
+      response = Response(status=500, response=r.text)
       return {'response':response}
 
   service_perimeters = {service_perimeter['title']:service_perimeter for service_perimeter in r.json()['servicePerimeters']}
@@ -234,6 +228,8 @@ def get_service_perimeter_status(token, project_id):
   r = requests.get(service_perimeter_data_uri, headers=headers)
   if r.status_code != 200:
     app.logger.info(f'  accesscontextmanager API rejected request: {r.text}')
+    if (r.json()['error']['status'] == 'PERMISSION_DENIED') and (r.json()['error']['message'].startswith('Access Context Manager API has not been used in project')):
+      return Response(status=200, response=json.dumps({'status':'BLOCKED', 'reason':'ACCESS_CONTEXT_MANAGER_API_DISABLED'}))
     if r.json()['error']['status'] == 'PERMISSION_DENIED':
       response = Response(status=200, response=json.dumps({'status':'BLOCKED', 'reason':'PERMISSION_DENIED'}))
       return {'response':response}
@@ -297,6 +293,9 @@ def get_agents(token, project_id, region):
   headers['Authorization'] = f'Bearer {token}'
   r = requests.get(f'https://{region}-dialogflow.googleapis.com/v3/projects/{project_id}/locations/{region}/agents', headers=headers)
   if r.status_code == 403:
+    if (r.json()['error']['status'] == 'PERMISSION_DENIED') and (r.json()['error']['message'].startswith('Dialogflow API has not been used in project')):
+      response = Response(status=200, response=json.dumps({'status':'BLOCKED', 'reason':'DIALOGFLOW_API_DISABLED'}))
+      return {'response':response}
     if r.json()['error']['status'] == 'PERMISSION_DENIED':
       response = Response(status=200, response=json.dumps({'status':'BLOCKED', 'reason':'PERMISSION_DENIED'}))
       return {'response':response}
@@ -310,6 +309,8 @@ def get_agents(token, project_id, region):
     response = Response(status=r.status_code, response=r.text)
     return {'response':response}
   result_dict = r.json()
+  if len(result_dict) == 0:
+    return {'response': Response(status=200, response=json.dumps({'status':'BLOCKED', 'reason':'AGENT_NOT_FOUND'}))}
   if 'error' in result_dict:
     app.logger.info(f'  get_agents error: {r.text}')
     return None
@@ -334,6 +335,21 @@ def get_webhooks(token, agent_name, project_id, region):
   return {'data':{data['displayName']:data for data in agents['webhooks']}}
 
 
+def check_function_exists(token, project_id, region, function_name):
+
+  headers = {}
+  headers["x-goog-user-project"] = project_id
+  headers['Authorization'] = f'Bearer {token}'
+  r = requests.get(f'https://cloudfunctions.googleapis.com/v1/projects/{project_id}/locations/{region}/functions/{function_name}', headers=headers)
+  if r.status_code == 200:
+    return {'status': 'OK'}
+  elif r.status_code == 404 and r.json()['error']['status']=='NOT_FOUND':
+    return {'response': Response(status=200, response=json.dumps({'status':'BLOCKED', 'reason':'WEBHOOK_NOT_FOUND'}))}
+  elif r.status_code == 403 and r.json()['error']['message'].startswith('Cloud Functions API has not been used in project'):
+    return {'response': Response(status=200, response=json.dumps({'status':'BLOCKED', 'reason':'CLOUDFUNCTIONS_API_DISABLED'}))}
+  else:
+    return {'response': Response(status=500, response=json.dumps(r.json()))}
+
 @app.route('/webhook_ingress_internal_only_status', methods=['GET'])
 def webhook_ingress_internal_only_status():
   app.logger.info(f'/webhook_ingress_internal_only_status:')
@@ -346,6 +362,10 @@ def webhook_ingress_internal_only_status():
   region = request.args['region']
   webhook_name = request.args['webhook_name']
 
+  response = check_function_exists(token, project_id, region, webhook_name)
+  if 'response' in response:
+    return response['response']
+
   headers = {}
   headers["x-goog-user-project"] = project_id
   headers['Authorization'] = f'Bearer {token}'
@@ -353,6 +373,8 @@ def webhook_ingress_internal_only_status():
   if r.status_code == 403:
     if (r.json()['error']['status'] == 'PERMISSION_DENIED') and (r.json()['error']['message'].startswith("Permission 'cloudfunctions.functions.get' denied on resource")):
       return Response(status=200, response=json.dumps({'status':'BLOCKED', 'reason':'PERMISSION_DENIED'}))
+    if (r.json()['error']['status'] == 'PERMISSION_DENIED') and (r.json()['error']['message'].startswith('Cloud Functions API has not been used in project')):
+      return Response(status=200, response=json.dumps({'status':'BLOCKED', 'reason':'CLOUDFUNCTIONS_API_DISABLED'}))
     for details in r.json()['error']['details']:
       for violation in details['violations']:
         if violation['type'] == 'VPC_SERVICE_CONTROLS':
@@ -380,6 +402,10 @@ def webhook_access_allow_unauthenticated_status():
   region = request.args['region']
   webhook_name = request.args['webhook_name']
 
+  response = check_function_exists(token, project_id, region, webhook_name)
+  if 'response' in response:
+    return response['response']
+
   headers = {}
   headers["x-goog-user-project"] = project_id
   headers['Authorization'] = f'Bearer {token}'
@@ -387,6 +413,8 @@ def webhook_access_allow_unauthenticated_status():
   if r.status_code == 403:
     if (r.json()['error']['status'] == 'PERMISSION_DENIED') and (r.json()['error']['message'].startswith('Permission \'cloudfunctions.functions.getIamPolicy\' denied')):
       return Response(status=200, response=json.dumps({'status':'BLOCKED', 'reason':'PERMISSION_DENIED'}))
+    if (r.json()['error']['status'] == 'PERMISSION_DENIED') and (r.json()['error']['message'].startswith('Cloud Functions API has not been used in project')):
+      return Response(status=200, response=json.dumps({'status':'BLOCKED', 'reason':'CLOUDFUNCTIONS_API_DISABLED'}))
     for details in r.json()['error']['details']:
       for violation in details['violations']:
         if violation['type'] == 'VPC_SERVICE_CONTROLS':
@@ -612,12 +640,8 @@ def update_service_directory_webhook_fulfillment():
   project_id = request.args['project_id']
   region = request.args['region']
   webhook_name = request.args['webhook_name']
-  
   webhook_trigger_uri = f'https://{region}-{project_id}.cloudfunctions.net/{webhook_name}'
-  headers = {}
-  headers['Content-type'] = 'application/json'
-  headers["x-goog-user-project"] = project_id
-  headers['Authorization'] = f'Bearer {token}'
+
   result = get_agents(token, project_id, region)
   if 'response' in result:
     return result['response']
@@ -783,14 +807,16 @@ def tf_plan(c, module, workdir, access_token, debug):
 
 
 @task
-def tf_apply(c, module, workdir, access_token, debug, destroy, target=None):
+def tf_apply(c, module, workdir, access_token, debug, destroy, target=None, verbose=False):
   target_option = f'-target={target}' if target else ''
   json_option = '-json' if not debug else ''
   destroy_option = '--destroy' if destroy == True else ''
+  verbose_option = 'export TF_LOG="DEBUG" &&' if verbose else ''
 
   promise = c.run(f'\
     cp {module} {workdir} &&\
     export GOOGLE_OAUTH_ACCESS_TOKEN={access_token} &&\
+    {verbose_option}\
     terraform -chdir="{workdir}" apply -lock-timeout=10s {json_option} --auto-approve -var-file="/app/deploy/terraform/testing.tfvars" -var access_token=\'{access_token}\' {destroy_option} {target_option}\
   ', warn=True, hide=None, asynchronous=True)
   result = promise.join()
@@ -839,6 +865,11 @@ def tf_state_list(c, module, workdir, access_token, debug):
   else:
     status_dict = {'resources': result.stdout.split()}
     if {
+      'module.service_perimeter.google_access_context_manager_access_policy.access-policy',
+      'module.service_perimeter.google_access_context_manager_service_perimeter.service-perimeter',
+    }.issubset(set(status_dict['resources'])):
+      status_dict['resources'].append('module.service_perimeter')
+    if {
       'module.service_directory.data.google_project.project',
       'module.service_directory.google_service_directory_endpoint.reverse_proxy',
       'module.service_directory.google_service_directory_namespace.reverse_proxy',
@@ -846,7 +877,7 @@ def tf_state_list(c, module, workdir, access_token, debug):
     }.issubset(set(status_dict['resources'])):
       status_dict['resources'].append('module.service_directory')
     if {
-      'module.services.google_project_service.accesscontextmanager',
+      'google_project_service.accesscontextmanager',
       'module.services.google_project_service.appengine',
       'module.services.google_project_service.artifactregistry',
       'google_project_service.cloudbuild',
@@ -881,32 +912,11 @@ def tf_state_list(c, module, workdir, access_token, debug):
       'module.vpc_network',
       'module.services',
       'module.service_directory',
+      'module.service_perimeter',
     }.issubset(set(status_dict['resources'])):
       status_dict['resources'].append('all')
     print(status_dict['resources'])
     return status_dict
-
-# @task
-# def tf_state_pull(c, module, workdir, access_token, debug):
-#   promise = c.run(f'\
-#     cp {module} {workdir} &&\
-#     export GOOGLE_OAUTH_ACCESS_TOKEN={access_token} &&\
-#     terraform -chdir="{workdir}" state pull', warn=True, hide=True, asynchronous=True)
-#   result = promise.join()
-#   if debug:
-#     print(result.exited)
-#     print(result.stdout)
-#     print(result.stderr)
-
-#   if result.exited:
-#     return {'response':Response(status=500, response=json.dumps({
-#       'status': 'ERROR',
-#       'stdout': result.stdout,
-#       'stderr': result.stderr,
-#     }))}
-#   else:
-#     deployed_resources = [f'{r["type"]}.{r["name"]}' for r in json.loads(result.stdout)['resources'] if r["mode"]=='managed']
-#     return {'deployed_resources': deployed_resources}
 
 
 @app.route('/update_target', methods=['POST'])
@@ -924,7 +934,6 @@ def update_target():
 
   if targets == ["all"]:
     targets = None
-
 
   c = context.Context()
   module = '/app/deploy/terraform/main.tf'
@@ -949,20 +958,6 @@ def update_target():
     resources = result['resources']
         
     return Response(status=200, response=json.dumps({'status':'OK', 'resources':resources}, indent=2))
-
-    # result = c.run(f'\
-    #   cp {module} {workdir} &&\
-    #   export GOOGLE_OAUTH_ACCESS_TOKEN={access_token} &&\
-    #   terraform -chdir="{workdir}" state pull', warn=True, hide=True
-    # )
-    # if result.exited:
-    #   return Response(status=500, response=json.dumps({
-    #     'status': 'ERROR',
-    #     'stdout': result.stdout,
-    #     'stderr': result.stderr,
-    #   }))
-    # status_list = [f'{r["type"]}.{r["name"]}' for r in json.loads(result.stdout)['resources'] if r["mode"]=='managed']
-    # print(len(status_list))
 
 
 @app.route('/validate_project_id', methods=['get'])
@@ -1073,401 +1068,3 @@ def import_resource():
   return Response(status=200, response=json.dumps({'status':'OK'}, indent=2))
 
 
-  # if True:
-  #   print('======INIT======')
-  #   tf_init(c, access_token=access_token, bucket=TF_PLAN_STORAGE_BUCKET, module=module, workdir=workdir, verbose=True)
-  #   print('=====REFRESH====')
-  #   # tf_plan(c, access_token=access_token, json_output=False, mode='refresh', workdir=workdir, verbose=True)
-  #   tf_apply(c, access_token=access_token, json_output=False, mode='deploy', workdir=workdir, verbose=True)
-  #   # print('=====DESTROY====')
-  #   # tf_apply(c, access_token=access_token, json_output=False, mode='destroy', target=target, workdir=workdir, verbose=True)
-  #   # tf_plan(c, access_token=access_token, json_output=False, mode='destroy', target=target, workdir=workdir, verbose=True)
-  #   print('=======END======')
-
-
-
-
-  # for address in project_addresses:
-  #   app.logger.info(f'  Collecting: {address}')
-  #   for change in tf_plan(c, access_token=access_token, json_output=True, destroy=True, target=address):
-  #     deployed.add(change['resource']['addr'])
-  #     # if change['resource']['addr'] not in address:
-  #     #   missing.add(change['resource']['addr'])
-  #   for change in tf_plan(c, access_token=access_token, json_output=True, destroy=False, target=address):
-  #     not_deployed.add(change['resource']['addr'])
-  #     # if change['resource']['addr'] not in address:
-  #     #   missing.add(change['resource']['addr'])
-  #   if address not in deployed and address not in not_deployed and address != 'google_project_service.services':
-  #     error.add(address)
-  # # for address in deployed:
-  # #   tf_apply(c, access_token, destroy=True, target=address)
-  # for address in not_deployed:
-  #   tf_apply(c, access_token, destroy=False, target=address)
-  # status = {
-  #   'deployed': sorted(list(deployed)), 
-  #   'not_deployed': sorted(list(not_deployed)),
-  #   'error': sorted(list(error)),
-  #   # 'missing': sorted(list(missing)),
-  # }
-  
-
-
-  # destroy = False
-  # target='google_dialogflow_cx_agent.full_agent'
-  # tf_init(c, access_token=access_token, bucket=bucket)
-  # changes = tf_plan(c, access_token=access_token, json_output=True, destroy=destroy, target=target)
-  # tf_apply(c, access_token, destroy=destroy, target=target)
-  # return Response(status=200, response='OK')
-
-
-  # tf_init(c, access_token=access_token, bucket=bucket)
-  # tf_apply(c, access_token, destroy=True, target='google_storage_bucket.bucket')
-  # tf_apply(c, access_token, destroy=True, target='google_dialogflow_cx_agent.full_agent')
-  # tf_apply(c, access_token, destroy=True, target='google_compute_network.vpc_network')
-  # tf_apply(c, access_token, destroy=True, target='google_compute_subnetwork.reverse_proxy_subnetwork')
-  # return Response(status=200, response='OK')
-
-  # tf_init(c, access_token=access_token, bucket=bucket)
-  # tf_import(c, access_token, 'google_dialogflow_cx_agent.full_agent', 'projects/vpc-sc-demo-nicholascain15/locations/us-central1/agents/70006bf3-af58-43a1-abec-6e50f789828b')
-  # return Response(status=200, response='OK')
-
-
-  
-  
-
-
-
-
-
-  # result_dict = {}
-  # for tfdir in ['apis', 'service_directory', 'vpc_network', 'webhook']:
-  #   workdir = f'/app/deploy/{tfdir}'
-  #   tf_init(c, access_token=access_token, workdir=workdir)
-  #   planned_changes = tf_plan(c, access_token=access_token, workdir=workdir)
-  #   print(planned_changes)
-  #   result_dict[tfdir] = len(planned_changes)
-  # return Response(status=200, response=json.dumps(result_dict))
-
-  # tf = pt.Terraform(working_dir='/app/terraform')
-#   tf.init()
-#   return_code, stdout, stderr = tf.plan(out="plan.out", variables=variables, refresh=False)
-#   if return_code not in [0,2]:
-#     response = f'({return_code}) Terraform Plan Failure:\n  stdoud: {stdout}\n  stderr: {stderr}'
-#     app.logger.error(response)
-#     if "Changes to Outputs:" in stdout:
-#       app.logger.error("Old state detected. Destroying and re-applying...")
-#       return_code, stdout, stderr = tf.apply("plan.out", skip_plan=True, var=None, destroy=True)
-#       if return_code != 0:
-#         response = f'({return_code}) Terraform Destroy Failure:\n  stdoud: {stdout}\n  stderr: {stderr}'
-#         app.logger.error(response)
-#         return Response(status=500, response=response)
-#       return_code, stdout, stderr = tf.plan(out="plan.out", variables=variables)
-#       if return_code not in [0,2]:
-#         response = f'({return_code}) Terraform Plan Failure:\n  stdoud: {stdout}\n  stderr: {stderr}'
-#         app.logger.error(response)
-#         return Response(status=500, response=response)
-#     else:
-#       return Response(status=500, response=response)
-
-#   return_code, stdout, stderr = tf.apply("plan.out", skip_plan=True, var=None)
-#   if return_code != 0:
-#     response = f'({return_code}) Terraform Apply Failure:\n  stdoud: {stdout}\n  stderr: {stderr}'
-#     app.logger.error(response)
-#     return Response(status=500, response=response)
-  
-#   app.logger.info('Terraform plan deployed.')
-#   return Response(status=200, response='OK')
-# # Error: Error acquiring the state lock
-
-
-  # terraform init && terraform apply --auto-approve \
-  #   -var access_token=$(gcloud auth print-access-token) \
-  #   -var project_id=${PROJECT_ID?} \
-  #   -var vpc_network=${VPC_NETWORK} \
-  #   -var vpc_subnetwork=${VPC_SUBNETWORK} \
-  #   -var reverse_proxy_server_ip=${REVERSE_PROXY_SERVER_IP} \
-  #   -var region=${REGION?}
-
-  # terraform init && terraform apply --auto-approve \
-  #   -var service_directory_namespace=${SERVICE_DIRECTORY_NAMESPACE?} \
-  #   -var service_directory_service=${SERVICE_DIRECTORY_SERVICE?} \
-  #   -var service_directory_endpoint=${SERVICE_DIRECTORY_ENDPOINT?} \
-  #   -var reverse_proxy_server_ip=${REVERSE_PROXY_SERVER_IP} \
-  #   -var vpc_network=${VPC_NETWORK} \
-  #   -var project_id=${PROJECT_ID?} \
-  #   -var access_token=$(gcloud auth print-access-token) \
-  #   -var region=${REGION?}
-
-  # terraform import \
-  #   -var service_directory_namespace=${SERVICE_DIRECTORY_NAMESPACE?} \
-  #   -var service_directory_service=${SERVICE_DIRECTORY_SERVICE?} \
-  #   -var service_directory_endpoint=${SERVICE_DIRECTORY_ENDPOINT?} \
-  #   -var reverse_proxy_server_ip=${REVERSE_PROXY_SERVER_IP} \
-  #   -var vpc_network=${VPC_NETWORK} \
-  #   -var project_id=${PROJECT_ID?} \
-  #   -var access_token=$(gcloud auth print-access-token) \
-  #   -var region=${REGION?} google_service_directory_namespace.reverse_proxy projects/vpc-sc-demo-nicholascain15/locations/us-central1/namespaces/df-namespace
-
-  # terraform import \
-  #   -var service_directory_namespace=${SERVICE_DIRECTORY_NAMESPACE?} \
-  #   -var service_directory_service=${SERVICE_DIRECTORY_SERVICE?} \
-  #   -var service_directory_endpoint=${SERVICE_DIRECTORY_ENDPOINT?} \
-  #   -var reverse_proxy_server_ip=${REVERSE_PROXY_SERVER_IP} \
-  #   -var vpc_network=${VPC_NETWORK} \
-  #   -var project_id=${PROJECT_ID?} \
-  #   -var access_token=$(gcloud auth print-access-token) \
-  #   -var region=${REGION?} google_service_directory_service.reverse_proxy projects/vpc-sc-demo-nicholascain15/locations/us-central1/namespaces/df-namespace/services/df-service
-
-  # terraform import \
-  #   -var service_directory_namespace=${SERVICE_DIRECTORY_NAMESPACE?} \
-  #   -var service_directory_service=${SERVICE_DIRECTORY_SERVICE?} \
-  #   -var service_directory_endpoint=${SERVICE_DIRECTORY_ENDPOINT?} \
-  #   -var reverse_proxy_server_ip=${REVERSE_PROXY_SERVER_IP} \
-  #   -var vpc_network=${VPC_NETWORK} \
-  #   -var project_id=${PROJECT_ID?} \
-  #   -var access_token=$(gcloud auth print-access-token) \
-  #   -var region=${REGION?} google_compute_network.vpc_network projects/vpc-sc-demo-nicholascain15/global/networks/webhook-net
-
-  # import google_compute_network.vpc_network projects/vpc-sc-demo-nicholascain15/global/networks/webhook-net
-
-
-  # terraform init && terraform apply --auto-approve \
-  #   -var access_token=$(gcloud auth print-access-token) \
-  #   -var project_id=${PROJECT_ID?} \
-  #   -var region=${REGION?} \
-  #   -var bucket=${PROJECT_ID?}-tf \
-  #   -var webhook_name=${WEBHOOK_NAME?} \
-
-  # curl -s -X POST \
-  #   -H "Authorization: Bearer $(gcloud auth print-access-token)" \
-  #   -H "Content-Type:application/json" \
-  #   -H "x-goog-user-project: ${PROJECT_ID?}" \
-  #   -d \
-  #   '{
-  #     "displayName": "Telecommunications",
-  #     "defaultLanguageCode": "en",
-  #     "timeZone": "America/Chicago"
-  #   }' \
-  #   "https://${REGION?}-dialogflow.googleapis.com/v3/projects/${PROJECT_ID?}/locations/${REGION?}/agents"
-
-  # export AGENT_NAME=$(curl -s -X GET -H "Authorization: Bearer $(gcloud auth print-access-token)" \
-  #   -H "Content-Type:application/json" \
-  #   -H "x-goog-user-project: ${PROJECT_ID}" \
-  #   "https://${REGION?}-dialogflow.googleapis.com/v3/projects/${PROJECT_ID?}/locations/${REGION?}/agents" | jq -r '.agents[0].name')
-
-  # curl -s -X POST \
-  #   -H "Authorization: Bearer $(gcloud auth print-access-token)" \
-  #   -H "Content-Type:application/json" \
-  #   -H "x-goog-user-project: ${PROJECT_ID?}" \
-  #   -d \
-  #   '{
-  #    "agentUri": "gs://gassets-api-ai/prebuilt_agents/cx-prebuilt-agents/exported_agent_Telecommunications.blob"
-  #   }' \
-  #   "https://${REGION?}-dialogflow.googleapis.com/v3/${AGENT_NAME?}:restore"
-
-
-
-  # plan_import = {
-  #   'vpc_network':{}, 
-  #   'service_directory':{},
-  #   'webhook':{}
-  # }
-  # plan_import['vpc_network']['google_compute_network.vpc_network'] = 'projects/vpc-sc-demo-nicholascain15/global/networks/webhook-net'
-  # plan_import['vpc_network']['google_compute_router.nat_router'] = 'projects/vpc-sc-demo-nicholascain15/regions/us-central1/routers/nat-router'
-  # plan_import['vpc_network']['google_compute_firewall.allow_dialogflow'] = 'projects/vpc-sc-demo-nicholascain15/global/firewalls/allow-dialogflow'
-  # plan_import['vpc_network']['google_compute_firewall.allow'] = 'projects/vpc-sc-demo-nicholascain15/global/firewalls/allow' 
-  # plan_import['vpc_network']['google_compute_subnetwork.reverse_proxy_subnetwork'] = 'projects/vpc-sc-demo-nicholascain15/regions/us-central1/subnetworks/webhook-subnet' 
-  # plan_import['vpc_network']['google_compute_address.reverse_proxy_address'] = 'projects/vpc-sc-demo-nicholascain15/regions/us-central1/addresses/webhook-reverse-proxy-address'
-  # plan_import['vpc_network']['google_compute_router_nat.nat_manual'] = 'projects/vpc-sc-demo-nicholascain15/regions/us-central1/routers/nat-router/nat-config'
-  # plan_import['service_directory']['google_compute_network.vpc_network'] = 'projects/vpc-sc-demo-nicholascain15/global/networks/webhook-net'
-  # plan_import['service_directory']['google_service_directory_namespace.reverse_proxy'] = 'projects/vpc-sc-demo-nicholascain15/locations/us-central1/namespaces/df-namespace'
-  # plan_import['service_directory']['google_service_directory_service.reverse_proxy'] = 'projects/vpc-sc-demo-nicholascain15/locations/us-central1/namespaces/df-namespace/services/df-service'
-  # plan_import['service_directory']['google_service_directory_endpoint.reverse_proxy'] = 'projects/vpc-sc-demo-nicholascain15/locations/us-central1/namespaces/df-namespace/services/df-service/endpoints/df-endpoint'
-  # plan_import['webhook']['google_cloudfunctions_function.function'] = 'projects/vpc-sc-demo-nicholascain15/locations/us-central1/functions/custom-telco-webhook'
-
-
-  # for address, resource in plan_import[plan].items():
-  #   tf_import(c, access_token, plan, address, resource)
-
-
-
-  # project_addresses = [
-  #   "google_project_service.services",
-  #   "google_storage_bucket.bucket",
-  #   "google_compute_network.vpc_network",
-  #   "google_compute_router.nat_router",
-  #   "google_compute_router_nat.nat_manual",
-  #   "google_compute_firewall.allow_dialogflow",
-  #   "google_compute_firewall.allow",
-  #   "google_compute_subnetwork.reverse_proxy_subnetwork",
-  #   "google_compute_address.reverse_proxy_address",
-  #   "google_cloudfunctions_function.webhook",
-  #   "google_storage_bucket_object.archive",
-  #   "google_service_directory_namespace.reverse_proxy",
-  #   "google_service_directory_service.reverse_proxy",
-  #   "google_service_directory_endpoint.reverse_proxy",
-  #   "google_dialogflow_cx_agent.full_agent",
-  # ]
-
-# @app.route('/update_target', methods=['POST'])
-# def update_target():
-#   token_dict = get_token(request, token_type='access_token')
-#   if 'response' in token_dict:
-#     return token_dict['response']
-#   access_token = token_dict['access_token']
-
-#   target = request.args['target']
-#   content = request.get_json(silent=True)
-#   mode = content['mode']
-
-#   c = context.Context()
-#   module = '/app/deploy/terraform/main.tf'
-#   with tempfile.TemporaryDirectory() as workdir:
-#     tf_init(c, access_token=access_token, bucket=TF_PLAN_STORAGE_BUCKET, module=module, workdir=workdir)
-#     tf_plan(c, access_token=access_token, json_output=False, mode='refresh', target=target, workdir=workdir)
-#     tf_apply(c, access_token=access_token, json_output=True, mode=mode, target=target, workdir=workdir)
-#     plan_response = tf_plan(c, access_token=access_token, json_output=True, mode='refresh', target=target, workdir=workdir)
-
-#   if plan_response.get('planned_changes',[]):
-#     status = 500
-#     return Response(status=status, response=json.dumps({'status': "ERROR"}, indent=2))
-#   else:
-#     status = 200
-#     deployed_status = False if mode == 'destroy' else True
-#     return Response(status=status, response=json.dumps({'status': deployed_status}, indent=2))
-
-
-
-# @task
-# def tf_init(c, access_token, bucket, workdir='/app/deploy', prefix='terraform/vpc_sc_demo', module=None, verbose=False):
-#   result = c.run(f'\
-#     cp {module} {workdir} &&\
-#     terraform -chdir={workdir} init')
-#   # promise = c.run(f'\
-#   #   mkdir -p {workdir} &&\
-#   #   cp {module} {workdir} &&\
-#   #   terraform -chdir={workdir} init -get=true -lock=false -upgrade -reconfigure -backend-config="access_token={access_token}" -backend-config="bucket={bucket}" -backend-config="prefix={prefix}"\
-#   # ', warn=True, hide=True, asynchronous=True)
-#   # result = promise.join()
-#   if not (result.exited == 0):
-#     print(result.stdout)
-#     print(result.stderr)
-#   assert result.exited == 0
-
-#   if verbose:
-#     print(result.exited)
-#     print(result.stdout)
-#     print(result.stderr)
-
-
-
-# @task
-# def tf_plan(c, access_token, mode='deploy', json_output=True, target=None, workdir='/app/deploy', verbose=False):
-
-#   target_option = f'-target={target}' if target else ''
-#   json_option = '-json' if json_output==True else '-no-color'
-#   if mode == 'deploy':
-#     destroy_option = ''
-#   elif mode == 'destroy':
-#     destroy_option = '--destroy'
-#   elif mode == 'refresh':
-#     destroy_option = '-refresh-only'
-#   else:
-#     raise RuntimeError(f"Unexpected option for mode: {mode}")
-
-#   promise = c.run(f'\
-#     cd {workdir} &&\
-#     export GOOGLE_OAUTH_ACCESS_TOKEN={access_token} &&\
-#     terraform -chdir={workdir} plan -lock=false -detailed-exitcode -var-file="/app/deploy/terraform/testing.tfvars" -var access_token=\'{access_token}\' {json_option} {destroy_option} {target_option} -compact-warnings\
-#   ', warn=True, hide=True, asynchronous=True)
-#   result = promise.join()
-
-#   response = {'stdout': result.stdout, 'stderr':result.stderr}
-#   if json_output:
-#     planned_changes = []
-#     errors = []
-#     lines = result.stdout.split('\n')
-#     for line in lines:
-#       if line.strip():
-#         message = json.loads(line)
-#         if message["@level"] == "error":
-#           app.logger.error(json.dumps(message, indent=2))
-#           errors.append(message)
-#         elif message['type'] == 'planned_change':
-#           planned_changes.append(message['change'])
-#         elif message["@level"] == "info":
-#           pass
-#         elif message['type'] == 'diagnostic' and message['@message'] == 'Warning: Resource targeting is in effect':
-#           pass
-#         elif message['type'] in ['refresh_start', 'refresh_complete']:
-#           pass
-#         else:
-#           print(json.dumps(message, indent=2))
-
-#     response['planned_changes'] = planned_changes
-#     response['errors'] = errors
-
-#   if verbose:
-#     print(result.exited)
-#     print(result.stdout)
-#     print(result.stderr)
-
-#   return response
-
-
-# @task
-# def tf_import(c, access_token, address, resource, workdir = '/app/deploy'):
-#   promise = c.run(f'\
-#     cd {workdir} &&\
-#     export GOOGLE_OAUTH_ACCESS_TOKEN={access_token} &&\
-#     terraform import -var-file="testing.tfvars" "{address}" "{resource}"\
-#   ', warn=True, hide=True, asynchronous=True)
-#   result = promise.join()
-#   print(result.stdout)
-
-
-# @task
-# def tf_apply(c, access_token, mode='deploy', workdir='/app/deploy', target=None, json_output=True, verbose=True):
-
-#   target_option = f'-target={target}' if target else ''
-#   json_option = '-json' if json_output==True else '-no-color'
-#   if mode == 'deploy':
-#     destroy_option = ''
-#   elif mode == 'destroy':
-#     destroy_option = '--destroy'
-#   elif mode == 'refresh':
-#     destroy_option = '-refresh-only'
-#   else:
-#     raise RuntimeError(f"Unexpected option for mode: {mode}")
-
-#   promise = c.run(f'\
-#     cd {workdir} &&\
-#     export GOOGLE_OAUTH_ACCESS_TOKEN={access_token} &&\
-#     terraform -chdir={workdir} apply -lock=false --auto-approve -var-file="/app/deploy/terraform/testing.tfvars" -var access_token=\'{access_token}\' {destroy_option} \'{target_option}\' {json_option}  -compact-warnings\
-#   ', warn=True, asynchronous=True)
-#   result = promise.join()
-
-#   if verbose:
-#     print(result.exited)
-#     print(result.stdout)
-#     print(result.stderr)
-
-#   if json_output:
-#     output = []
-#     apply_complete = []
-#     lines = result.stdout.split('\n')
-#     for line in lines:
-#       if line.strip():
-#         message = json.loads(line)
-#         output.append(message)
-#         if message['type'] == 'apply_complete':
-#           apply_complete.append(message)
-#         elif message["@level"] == "error":
-#           app.logger.error(json.dumps(message, indent=2))
-#         else:
-#           pass
-        
-
-#     return {'stdout': output, 'stderr':result.stderr, 'apply_complete':apply_complete}
-#   else:
-#     return {'stdout': result.stdout, 'stderr':result.stderr}

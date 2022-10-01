@@ -58,10 +58,15 @@ variable "webhook_src" {
   type        = string
 }
 
+variable "service_perimeter" {
+  description = "Service Perimeter"
+  type        = string
+}
+
 provider "google" {
   project     = var.project_id
   region      = var.region
-  user_project_override = true
+  # user_project_override = true
 }
 
 terraform {
@@ -77,35 +82,42 @@ terraform {
 resource "google_project_service" "servicedirectory" {
   service = "servicedirectory.googleapis.com"
   project            = var.project_id
-  disable_on_destroy = true
+  disable_on_destroy = false
   disable_dependent_services = true
 }
 
 resource "google_project_service" "compute" {
   service = "compute.googleapis.com"
   project            = var.project_id
-  disable_on_destroy = true
+  disable_on_destroy = false
   disable_dependent_services = true
 }
 
 resource "google_project_service" "dialogflow" {
   service = "dialogflow.googleapis.com"
   project            = var.project_id
-  disable_on_destroy = true
+  disable_on_destroy = false
   disable_dependent_services = true
 }
 
 resource "google_project_service" "cloudfunctions" {
   service = "cloudfunctions.googleapis.com"
   project            = var.project_id
-  disable_on_destroy = true
+  disable_on_destroy = false
   disable_dependent_services = true
 }
 
 resource "google_project_service" "cloudbuild" {
   service = "cloudbuild.googleapis.com"
   project            = var.project_id
-  disable_on_destroy = true
+  disable_on_destroy = false
+  disable_dependent_services = true
+}
+
+resource "google_project_service" "accesscontextmanager" {
+  service = "accesscontextmanager.googleapis.com"
+  project            = var.project_id
+  disable_on_destroy = false
   disable_dependent_services = true
 }
 
@@ -118,6 +130,7 @@ module "services" {
     google_project_service.dialogflow,
     google_project_service.cloudfunctions,
     google_project_service.cloudbuild,
+    google_project_service.accesscontextmanager,
   ]
 }
 
@@ -154,4 +167,11 @@ module "webhook_agent" {
   dialogflow_api = google_project_service.dialogflow
   cloudfunctions_api = google_project_service.cloudfunctions
   cloudbuild_api = google_project_service.cloudbuild
+}
+
+module "service_perimeter" {
+  source = "/app/deploy/terraform/service-perimeter"
+  project_id = var.project_id
+  service_perimeter = var.service_perimeter
+  accesscontextmanager_api = google_project_service.accesscontextmanager
 }

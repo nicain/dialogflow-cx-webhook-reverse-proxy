@@ -53,7 +53,7 @@ function GetPrincipal(props) {
       InputProps={{
         style: { "backgroundColor": loginEnabled ? "#ffcdd2" : "transparent" },
         endAdornment: (
-          <Tooltip title={tooltipTitle} disableInteractive arrow placement="right">
+          <Tooltip title={tooltipTitle} disableInteractive arrow placement="top">
             <InputAdornment position="end">
               <IconButton edge='end' variant="outlined" href={href}>
                  {button}

@@ -8,6 +8,8 @@ import {
 } from "react-router-dom";
 import {getPage} from './DataModel.js';
 import Tooltip from '@mui/material/Tooltip';
+import { backendEnabled, handleTokenExpired } from './Utilities.js';
+import Typography from '@mui/material/Typography';
 
 const TIMER_SCALE = 10;
 
@@ -71,7 +73,7 @@ function ToggleStatus(props) {
         onChange={onChange} 
         checked={typeof(props.state.status.current) == "boolean" ? props.state.status.current : false}
         disabled={typeof(props.state.isUpdating.current) == "boolean" ? (props.state.isUpdating.current || props.state.blocked.current) : false}
-        style={{visibility: (props.state.blocked.current || props.state.isUpdating.current) ? "hidden" : "visible"}}
+        style={{visibility: (!props.dataModel.loggedIn.current || props.state.blocked.current || props.state.isUpdating.current) ? "hidden" : "visible"}}
         color="secondary"
       />}
     </>
@@ -120,7 +122,7 @@ function PollStatus(props) {
       refetchInterval: 10000,
       onSuccess: onSuccess,
       retry: false,
-      enabled: props.state.isUpdating.current==null ? false : !props.state.isUpdating.current,
+      enabled: !props.state.isUpdating.current && backendEnabled(props.dataModel),
     }
   );
 
@@ -128,8 +130,16 @@ function PollStatus(props) {
     if (data && completed.current){
       completed.current = false;
       props.state.status.set(data.status)
+      console.log(data)
       if (data.status === 'BLOCKED') {
         props.state.blocked.set(true)
+        if (
+          data.reason==='TOKEN_EXPIRED' & 
+          props.dataModel.loggedIn.current & 
+          !props.dataModel.sessionExpiredModalOpen.current
+        ) {
+          handleTokenExpired(props.dataModel)
+        }
       } else {
         props.state.blocked.set(false)
       }
@@ -156,11 +166,14 @@ function PollStatus(props) {
     return <CircularProgress size={20}/>;
   } else if (props.state.blocked.current) {
     return (
-      <Tooltip title={`Reason: ${data.reason}`} arrow placement="top">
-        <div style={{ color: 'red' }}>{"Blocked"}</div>
-      </Tooltip>
-    );
+      <Typography variant="body2" align="right" style={{ color: 'red' }}>
+        {`Blocked: ${data.reason}`}
+      </Typography> 
+    )
+    } else if (!props.dataModel.loggedIn.current) {
+      <div style={{ color: 'red' }}>{`Blocked: LOGIN_REQUIRED`}</div>;
   } else {
+    // console.log(props.state.blocked.current)
     return (<div>{(props.state.status.current) ? "True" : "False"}</div>);
   }
 }

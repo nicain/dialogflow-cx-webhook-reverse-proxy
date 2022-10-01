@@ -12,26 +12,30 @@ function StateImage(props) {
   const isLoading = renderedPageNumber.current !== currPage;
   const pageHeight = 300
   return(
-  <Document file={diagram_sd}>
-    <Box sx={{ width: "75%"}} display="flex" justifyContent="center" alignItems="center" margin="auto">
-      {isLoading && renderedPageNumber.current ? (
-        <Page 
-            key={renderedPageNumber.current}
-            className="prevPage"
-            pageNumber={renderedPageNumber.current} 
-            height={pageHeight}
-            loading={<div><Box sx={{ width: "75%"}} display="flex" justifyContent="center" alignItems="center" margin="auto"><Paper variant="string" sx={{ width: "75%", height:pageHeight}}></Paper></Box></div>}
-          />
-        ) : null}
+
+  <Paper variant="string" sx={{ width:750, height:pageHeight, pl:2}}>
+    <Document file={diagram_sd} loading="">
+        {
+          (isLoading && renderedPageNumber.current) ? (
+            <Page 
+              key={renderedPageNumber.current}
+              className="prevPage"
+              pageNumber={renderedPageNumber.current} 
+              height={pageHeight}
+              loading=""
+            />
+          ) : null
+        }
         <Page
           key={currPage}
           pageNumber={currPage}
           height={pageHeight}
           onRenderSuccess={() => {renderedPageNumber.set(currPage)}}
-          loading={<div><Box sx={{ width: "75%"}} display="flex" justifyContent="center" alignItems="center" margin="auto"><Paper variant="string" sx={{ width: "75%", height:pageHeight}}></Paper></Box></div>}
+          loading=""
         />
-    </Box>
-  </Document>
-)}
+    </Document>
+  </Paper>
+  )
+}
 
 export {StateImage}
