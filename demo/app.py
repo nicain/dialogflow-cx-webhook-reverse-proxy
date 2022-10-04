@@ -9,8 +9,10 @@ import uuid
 import zipfile
 import io
 import tempfile
+import tasks
+from invoke import context
 
-from invoke import task, context
+
 from urllib.parse import urlparse 
 
 from google.oauth2 import id_token
@@ -56,14 +58,7 @@ AUTH_SERVICE_AUTH_ENDPOINT = f'http://{AUTH_SERVICE_HOSTNAME}/auth'
 AUTH_SERVICE_VERIFY_AUD_ENDPOINT = f'http://{AUTH_SERVICE_HOSTNAME}/verify_aud'
 AUTH_SERVICE_LOGIN_ENDPOINT = f'http://{AUTH_SERVICE_HOSTNAME}/login'
 
-TF_PLAN_STORAGE_BUCKET = 'vpc-sc-demo-nicholascain15-tf'
-
-SERVICE_DIRECTORY_NAMESPACE = 'df-namespace'
-SERVICE_DIRECTORY_SERVICE = 'df-service'
 DOMAIN = 'webhook.internal'
-
-ACCESS_POLICY_NAME = 'accessPolicies/102736959981'
-PERIMETER_TITLE = 'df_webhook'
 
 
 import base64
@@ -195,8 +190,9 @@ def logout():
   return response
   
 
-def get_service_perimeter_data_uri(token, project_id):
-  access_policy_id = ACCESS_POLICY_NAME.split('/')[1]
+def get_service_perimeter_data_uri(token, project_id, access_policy_name):
+  perimeter_title = 'df_webhook'
+  access_policy_id = access_policy_name.split('/')[1]
   headers = {}
   headers["x-goog-user-project"] = project_id
   headers['Authorization'] = f'Bearer {token}'
@@ -213,18 +209,21 @@ def get_service_perimeter_data_uri(token, project_id):
       response = Response(status=500, response=r.text)
       return {'response':response}
 
-  service_perimeters = {service_perimeter['title']:service_perimeter for service_perimeter in r.json()['servicePerimeters']}
-  return f'https://accesscontextmanager.googleapis.com/v1/{service_perimeters[PERIMETER_TITLE]["name"]}'
+  for service_perimeter_dict in r.json().get('servicePerimeters', []):
+    if service_perimeter_dict['title'] == perimeter_title:
+      return {'uri': f'https://accesscontextmanager.googleapis.com/v1/{service_perimeter_dict["name"]}'}
+  
+  return {'response': Response(status=200, response=json.dumps({'status':'BLOCKED', 'reason':'PERIMETER_NOT_FOUND'}))}
 
 
-
-def get_service_perimeter_status(token, project_id):
+def get_service_perimeter_status(token, project_id, access_policy_name):
   headers = {}
   headers["x-goog-user-project"] = project_id
   headers['Authorization'] = f'Bearer {token}'
-  service_perimeter_data_uri = get_service_perimeter_data_uri(token, project_id)
-  if 'response' in service_perimeter_data_uri:
-    return service_perimeter_data_uri
+  response = get_service_perimeter_data_uri(token, project_id, access_policy_name)
+  if 'response' in response:
+    return response
+  service_perimeter_data_uri = response['uri']
   r = requests.get(service_perimeter_data_uri, headers=headers)
   if r.status_code != 200:
     app.logger.info(f'  accesscontextmanager API rejected request: {r.text}')
@@ -239,8 +238,8 @@ def get_service_perimeter_status(token, project_id):
   return r.json()
 
 
-def get_restricted_services_status(token, project_id):
-  service_perimeter_status = get_service_perimeter_status(token, project_id)
+def get_restricted_services_status(token, project_id, access_policy_name):
+  service_perimeter_status = get_service_perimeter_status(token, project_id, access_policy_name)
   if 'response' in service_perimeter_status:
     return service_perimeter_status
   status_dict = {}
@@ -251,7 +250,55 @@ def get_restricted_services_status(token, project_id):
     status_dict['cloudfunctions_restricted'] = 'cloudfunctions.googleapis.com' in service_perimeter_status['status']['restrictedServices']
     status_dict['dialogflow_restricted'] = 'dialogflow.googleapis.com' in service_perimeter_status['status']['restrictedServices']
   return status_dict
-    
+
+
+def get_project_number(token, project_id):
+
+  headers = {}
+  headers['Content-type'] = 'application/json'
+  headers['Authorization'] = f'Bearer {token}'
+  r = requests.get(f'https://cloudresourcemanager.googleapis.com/v1/projects/{project_id}', headers=headers)
+  if 'projectNumber' in r.json():
+    return {'project_number':r.json()['projectNumber']}
+  else:
+    return {'response': Response(status=200, response=json.dumps({'status':'BLOCKED', 'reason':'NO_PROJECT'}))}
+
+
+def get_access_policy_name(token, access_policy_title, project_id):
+
+  headers = {}
+  headers['Content-type'] = 'application/json'
+  headers['Authorization'] = f'Bearer {token}'
+  r = requests.post(f'https://cloudresourcemanager.googleapis.com/v1/projects/{project_id}:getAncestry', headers=headers)
+  if r.status_code != 200:
+      return {"response": Response(status=500, response=r.text)}
+  
+  organization_id = None
+  for ancestor_dict in r.json().get('ancestor', []):
+    if ancestor_dict["resourceId"]["type"] == 'organization':
+      organization_id = ancestor_dict["resourceId"]["id"]
+  if not organization_id:
+    return {"response": Response(status=200, response=json.dumps({'status':'BLOCKED', 'reason':'NO_ORGANIZATION'}))}
+
+  response = get_project_number(token, project_id)
+  if 'response' in response:
+    return response['response']
+  project_number = response['project_number']
+
+  headers = {}
+  headers['Content-type'] = 'application/json'
+  headers['Authorization'] = f'Bearer {token}'
+  r = requests.get(f'https://accesscontextmanager.googleapis.com/v1/accessPolicies?parent=organizations/{organization_id}', headers=headers)
+
+  for policy in r.json().get('accessPolicies', []):
+    if policy['title'] == access_policy_title:
+      if f'projects/{project_number}' in policy['scopes']:
+        return {"access_policy_name": policy['name']}
+      # else:
+      #   return {"response": Response(status=200, response=json.dumps({'status':'BLOCKED', 'reason':'PROJECT_NOT_IN_POLICY_SCOPE'}))}
+
+  return {"response": Response(status=200, response=json.dumps({'status':'BLOCKED', 'reason':'POLICY_NOT_FOUND'}))}
+
 
 @app.route('/restricted_services_status_cloudfunctions', methods=['GET'])
 def restricted_services_status_cloudfunctions():
@@ -262,7 +309,13 @@ def restricted_services_status_cloudfunctions():
   token = token_dict['access_token']
 
   project_id = request.args['project_id']
-  status_dict = get_restricted_services_status(token, project_id)
+  access_policy_title = request.args['access_policy_title']
+
+  response = get_access_policy_name(token, access_policy_title, project_id)
+  if 'response' in response:
+    return response['response']
+  access_policy_name = response['access_policy_name']
+  status_dict = get_restricted_services_status(token, project_id, access_policy_name)
   if 'response' in status_dict:
     return status_dict['response']
 
@@ -279,7 +332,13 @@ def restricted_services_status_dialogflow():
   token = token_dict['access_token']
 
   project_id = request.args['project_id']
-  status_dict = get_restricted_services_status(token, project_id)
+  access_policy_title = request.args['access_policy_title']
+
+  response = get_access_policy_name(token, access_policy_title, project_id)
+  if 'response' in response:
+    return response['response']
+  access_policy_name = response['access_policy_name']
+  status_dict = get_restricted_services_status(token, project_id, access_policy_name)
   if 'response' in status_dict:
     return status_dict['response']
 
@@ -296,14 +355,13 @@ def get_agents(token, project_id, region):
     if (r.json()['error']['status'] == 'PERMISSION_DENIED') and (r.json()['error']['message'].startswith('Dialogflow API has not been used in project')):
       response = Response(status=200, response=json.dumps({'status':'BLOCKED', 'reason':'DIALOGFLOW_API_DISABLED'}))
       return {'response':response}
-    if r.json()['error']['status'] == 'PERMISSION_DENIED':
-      response = Response(status=200, response=json.dumps({'status':'BLOCKED', 'reason':'PERMISSION_DENIED'}))
-      return {'response':response}
     for details in r.json()['error']['details']:
       for violation in details['violations']:
         if violation['type'] == 'VPC_SERVICE_CONTROLS':
-          response = Response(status=200, response=json.dumps({'status':'BLOCKED', 'reason':'VPC_SERVICE_CONTROLS'}))
-          return {'response':response}
+          return {"response": Response(status=200, response=json.dumps({'status':'BLOCKED', 'reason':'VPC_SERVICE_CONTROLS'}))}
+    if r.json()['error']['status'] == 'PERMISSION_DENIED':
+      response = Response(status=200, response=json.dumps({'status':'BLOCKED', 'reason':'PERMISSION_DENIED'}))
+      return {'response':response}
   elif r.status_code != 200:
     app.logger.info(f'  dialogflow API rejected request: {r.text}')
     response = Response(status=r.status_code, response=r.text)
@@ -347,6 +405,14 @@ def check_function_exists(token, project_id, region, function_name):
     return {'response': Response(status=200, response=json.dumps({'status':'BLOCKED', 'reason':'WEBHOOK_NOT_FOUND'}))}
   elif r.status_code == 403 and r.json()['error']['message'].startswith('Cloud Functions API has not been used in project'):
     return {'response': Response(status=200, response=json.dumps({'status':'BLOCKED', 'reason':'CLOUDFUNCTIONS_API_DISABLED'}))}
+  elif r.status_code == 403:
+    if (r.json()['error']['status'] == 'PERMISSION_DENIED') and (r.json()['error']['message'].startswith("Permission 'cloudfunctions.functions.get' denied on resource")):
+      return {'response': Response(status=200, response=json.dumps({'status':'BLOCKED', 'reason':'PERMISSION_DENIED'}))}
+    for details in r.json()['error']['details']:
+      for violation in details['violations']:
+        if violation['type'] == 'VPC_SERVICE_CONTROLS':
+          return {'response': Response(status=200, response=json.dumps({'status':'BLOCKED', 'reason':'VPC_SERVICE_CONTROLS'}))}
+    return {'response': Response(status=500, response=r.text)}
   else:
     return {'response': Response(status=500, response=json.dumps(r.json()))}
 
@@ -370,16 +436,6 @@ def webhook_ingress_internal_only_status():
   headers["x-goog-user-project"] = project_id
   headers['Authorization'] = f'Bearer {token}'
   r = requests.get(f'https://cloudfunctions.googleapis.com/v1/projects/{project_id}/locations/{region}/functions/{webhook_name}', headers=headers)
-  if r.status_code == 403:
-    if (r.json()['error']['status'] == 'PERMISSION_DENIED') and (r.json()['error']['message'].startswith("Permission 'cloudfunctions.functions.get' denied on resource")):
-      return Response(status=200, response=json.dumps({'status':'BLOCKED', 'reason':'PERMISSION_DENIED'}))
-    if (r.json()['error']['status'] == 'PERMISSION_DENIED') and (r.json()['error']['message'].startswith('Cloud Functions API has not been used in project')):
-      return Response(status=200, response=json.dumps({'status':'BLOCKED', 'reason':'CLOUDFUNCTIONS_API_DISABLED'}))
-    for details in r.json()['error']['details']:
-      for violation in details['violations']:
-        if violation['type'] == 'VPC_SERVICE_CONTROLS':
-          return Response(status=200, response=json.dumps({'status':'BLOCKED', 'reason':'VPC_SERVICE_CONTROLS'}))
-    return Response(status=500, response=r.text)
   if r.status_code != 200:
     app.logger.info(f'  cloudfunctions API rejected request: {r.text}')
     return abort(r.status_code)
@@ -551,8 +607,8 @@ def update_service_perimeter_status_inplace(api, restrict_access, service_perime
       service_perimeter_status['status']['restrictedServices'].append(api)
 
 
-def update_security_perimeter(token, api, restrict_access, project_id):
-  service_perimeter_status = get_service_perimeter_status(token, project_id)
+def update_security_perimeter(token, api, restrict_access, project_id, access_policy_name):
+  service_perimeter_status = get_service_perimeter_status(token, project_id, access_policy_name)
   response = update_service_perimeter_status_inplace(api, restrict_access, service_perimeter_status)
   if response:
     return response
@@ -560,7 +616,10 @@ def update_security_perimeter(token, api, restrict_access, project_id):
   headers = {}
   headers["x-goog-user-project"] = project_id
   headers['Authorization'] = f'Bearer {token}'
-  service_perimeter_data_uri = get_service_perimeter_data_uri(token, project_id)
+  response = get_service_perimeter_data_uri(token, project_id, access_policy_name)
+  if 'response' in response:
+    return response
+  service_perimeter_data_uri = response['uri']
   r = requests.patch(service_perimeter_data_uri, headers=headers, json=service_perimeter_status, params={'updateMask':'status.restrictedServices'})
   if r.status_code != 200:
     app.logger.info(f'  accesscontextmanager API rejected PATCH request: {r.text}')
@@ -577,10 +636,15 @@ def update_security_perimeter_cloudfunctions():
   token = token_dict['access_token']
 
   project_id = request.args['project_id']
+  access_policy_title = request.args['access_policy_title']
+  response = get_access_policy_name(token, access_policy_title, project_id)
+  if 'response' in response:
+    return response['response']
+  access_policy_name = response['access_policy_name']
 
   content = request.get_json(silent=True)
   restrict_access = content['status']
-  return update_security_perimeter(token, 'cloudfunctions.googleapis.com', restrict_access, project_id)
+  return update_security_perimeter(token, 'cloudfunctions.googleapis.com', restrict_access, project_id, access_policy_name)
 
 
 @app.route('/update_security_perimeter_dialogflow', methods=['POST'])
@@ -592,10 +656,15 @@ def update_security_perimeter_dialogflow():
   token = token_dict['access_token']
 
   project_id = request.args['project_id']
+  access_policy_title = request.args['access_policy_title']
+  response = get_access_policy_name(token, access_policy_title, project_id)
+  if 'response' in response:
+    return response['response']
+  access_policy_name = response['access_policy_name']
 
   content = request.get_json(silent=True)
   restrict_access = content['status']
-  return update_security_perimeter(token, 'dialogflow.googleapis.com', restrict_access, project_id)
+  return update_security_perimeter(token, 'dialogflow.googleapis.com', restrict_access, project_id, access_policy_name)
 
 
 @app.route('/service_directory_webhook_fulfillment_status', methods=['GET'])
@@ -640,6 +709,8 @@ def update_service_directory_webhook_fulfillment():
   project_id = request.args['project_id']
   region = request.args['region']
   webhook_name = request.args['webhook_name']
+  service_directory_namespace = "df-namespace"
+  service_directory_service = "df-service"
   webhook_trigger_uri = f'https://{region}-{project_id}.cloudfunctions.net/{webhook_name}'
 
   result = get_agents(token, project_id, region)
@@ -664,7 +735,7 @@ def update_service_directory_webhook_fulfillment():
     data = {
       "displayName": "cxPrebuiltAgentsTelecom", 
       "serviceDirectory": {
-        "service": f'projects/{project_id}/locations/{region}/namespaces/{SERVICE_DIRECTORY_NAMESPACE}/services/{SERVICE_DIRECTORY_SERVICE}',
+        "service": f'projects/{project_id}/locations/{region}/namespaces/{service_directory_namespace}/services/{service_directory_service}',
         "genericWebService": {
           "uri": f'https://{DOMAIN}',
           "allowedCaCerts": [b64Encode(allowed_ca_cert)]
@@ -673,6 +744,11 @@ def update_service_directory_webhook_fulfillment():
     }
   else:
     return Response(status=500, response=f'Unexpected setting for fulfillment: {fulfillment}')
+
+
+  headers = {}
+  headers["x-goog-user-project"] = project_id
+  headers['Authorization'] = f'Bearer {token}'
   r = requests.patch(f'https://{region}-dialogflow.googleapis.com/v3/{webhook_name}', headers=headers, json=data)
   if r.status_code != 200:
     app.logger.info(f'  dialogflow API unexpectedly rejected invocation POST request: {r.text}')
@@ -688,277 +764,6 @@ def get_principal():
     return token_dict['response']
   return Response(status=200, response=json.dumps({'principal': token_dict['email']}))
   
-
-
-
-@app.route('/asset_status', methods=['GET'])
-def asset_status():
-  token_dict = get_token(request, token_type='access_token')
-  if 'response' in token_dict:
-    return token_dict['response']
-  access_token = token_dict['access_token']
-
-  project_id = request.args['project_id']
-  debug = request.args.get('debug')
-
-  c = context.Context()
-  module = '/app/deploy/terraform/main.tf'
-  prefix = f'terraform/{project_id}'
-  with tempfile.TemporaryDirectory() as workdir:
-
-    result = tf_init(c, module, workdir, access_token, prefix, debug)
-    if result: return result
-
-    result = tf_plan(c, module, workdir, access_token, debug)
-    if result: return result
-
-    result = tf_state_list(c, module, workdir, access_token, debug)
-    if 'response' in result: return result["response"]
-    resources = result['resources']
-        
-    return Response(status=200, response=json.dumps({'status':'OK', 'resources':resources}, indent=2))
-
-
-#   token_dict = get_token(request, token_type='access_token')
-#   if 'response' in token_dict:
-#     return token_dict['response']
-#   access_token = token_dict['access_token']
-
-#   target = request.args['target']
-
-#   c = context.Context()
-#   module = '/app/deploy/terraform/main.tf'
-#   with tempfile.TemporaryDirectory() as workdir:
-#     tf_init(c, access_token=access_token, bucket=TF_PLAN_STORAGE_BUCKET, module=module, workdir=workdir)
-#     plan_response = tf_plan(c, access_token=access_token, json_output=True, mode='refresh', target=target, workdir=workdir)
-
-#   if plan_response['errors']:
-#     if 'SERVICE_DISABLED' in json.dumps(plan_response['errors']):
-#       reason = 'SERVICE_DISABLED'
-#     else:
-#       reason = 'UNKNOWN'
-#     return Response(status=200, response=json.dumps({
-#       'status': 'ERROR', 
-#       'errors': plan_response['errors'],
-#       'reason': reason,
-#       }, indent=2)
-#     )
-
-#   if not plan_response['planned_changes']:
-#     return Response(status=200, response=json.dumps({'status': True}, indent=2))
-#   else:
-#     return Response(status=200, response=json.dumps({'status': False}, indent=2))
-
-
-
-
-@task
-def tf_init(c, module, workdir, access_token, prefix, debug):
-  promise = c.run(f'\
-    cp {module} {workdir} &&\
-    terraform -chdir={workdir} init -upgrade -reconfigure -backend-config="access_token={access_token}" -backend-config="bucket={TF_PLAN_STORAGE_BUCKET}" -backend-config="prefix={prefix}"\
-  ', warn=True, hide=True, asynchronous=True)
-  result = promise.join()
-
-  if debug:
-    print(result.exited)
-    print(result.stdout)
-    print(result.stderr)
-
-  if result.exited:
-    return Response(status=500, response=json.dumps({
-      'status': 'ERROR',
-      'stdout': result.stdout,
-      'stderr': result.stderr,
-    }))
-
-
-@task
-def tf_plan(c, module, workdir, access_token, debug):
-  json_option = '-json' if not debug else ''
-  promise = c.run(f'\
-    cp {module} {workdir} &&\
-    export GOOGLE_OAUTH_ACCESS_TOKEN={access_token} &&\
-    terraform -chdir="{workdir}" plan {json_option} -refresh-only -var-file="/app/deploy/terraform/testing.tfvars" -var access_token=\'{access_token}\'\
-  ', warn=True, hide=True, asynchronous=True)
-  result = promise.join()
-
-  if debug:
-    print(result.exited)
-    print(result.stdout)
-    print(result.stderr)
-  else:
-    errors = []
-    lines = result.stdout.split('\n')
-    for line in lines:
-      if line.strip():
-        try:
-          message = json.loads(line)
-          if message["@level"] == "error":
-            app.logger.error(json.dumps(message, indent=2))
-            errors.append(message)
-        except:
-          print("COULD NOT LOAD", line)
-    if errors:
-      return Response(status=500, response=json.dumps({
-        'status': 'ERROR',
-        'errors': errors,
-      }))
-
-
-@task
-def tf_apply(c, module, workdir, access_token, debug, destroy, target=None, verbose=False):
-  target_option = f'-target={target}' if target else ''
-  json_option = '-json' if not debug else ''
-  destroy_option = '--destroy' if destroy == True else ''
-  verbose_option = 'export TF_LOG="DEBUG" &&' if verbose else ''
-
-  promise = c.run(f'\
-    cp {module} {workdir} &&\
-    export GOOGLE_OAUTH_ACCESS_TOKEN={access_token} &&\
-    {verbose_option}\
-    terraform -chdir="{workdir}" apply -lock-timeout=10s {json_option} --auto-approve -var-file="/app/deploy/terraform/testing.tfvars" -var access_token=\'{access_token}\' {destroy_option} {target_option}\
-  ', warn=True, hide=None, asynchronous=True)
-  result = promise.join()
-  if debug:
-    print(result.exited)
-    print(result.stdout)
-    print(result.stderr)
-  else:
-    errors = []
-    lines = result.stdout.split('\n')
-    for line in lines:
-      if line.strip():
-        try:
-          message = json.loads(line)
-          if message["@level"] == "error":
-            app.logger.error(json.dumps(message, indent=2))
-            errors.append(message)
-        except:
-          print("COULD NOT LOAD", line)
-    if errors:
-      return Response(status=500, response=json.dumps({
-        'status': 'ERROR',
-        'errors': errors,
-      }))
-
-@task
-def tf_state_list(c, module, workdir, access_token, debug):
-  promise = c.run(f'\
-    cp {module} {workdir} &&\
-    export GOOGLE_OAUTH_ACCESS_TOKEN={access_token} &&\
-    terraform -chdir="{workdir}" state list', warn=True, hide=True, asynchronous=True)
-  result = promise.join()
-
-  
-  if debug:
-    print(result.exited)
-    print(result.stdout)
-    print(result.stderr)
-
-  if result.exited:
-    return {'response':Response(status=500, response=json.dumps({
-      'status': 'ERROR',
-      'stdout': result.stdout,
-      'stderr': result.stderr,
-    }))}
-  else:
-    status_dict = {'resources': result.stdout.split()}
-    if {
-      'module.service_perimeter.google_access_context_manager_access_policy.access-policy',
-      'module.service_perimeter.google_access_context_manager_service_perimeter.service-perimeter',
-    }.issubset(set(status_dict['resources'])):
-      status_dict['resources'].append('module.service_perimeter')
-    if {
-      'module.service_directory.data.google_project.project',
-      'module.service_directory.google_service_directory_endpoint.reverse_proxy',
-      'module.service_directory.google_service_directory_namespace.reverse_proxy',
-      'module.service_directory.google_service_directory_service.reverse_proxy',
-    }.issubset(set(status_dict['resources'])):
-      status_dict['resources'].append('module.service_directory')
-    if {
-      'google_project_service.accesscontextmanager',
-      'module.services.google_project_service.appengine',
-      'module.services.google_project_service.artifactregistry',
-      'google_project_service.cloudbuild',
-      'module.services.google_project_service.iam',
-      'module.services.google_project_service.run',
-      'google_project_service.servicedirectory',
-      'module.services.google_project_service.vpcaccess',
-      'google_project_service.compute',
-      'google_project_service.cloudfunctions',
-      'google_project_service.dialogflow',
-    }.issubset(set(status_dict['resources'])):
-      status_dict['resources'].append('module.services')
-    if {
-      'module.vpc_network.google_compute_address.reverse_proxy_address',
-      'module.vpc_network.google_compute_firewall.allow',
-      'module.vpc_network.google_compute_firewall.allow_dialogflow',
-      'module.vpc_network.google_compute_network.vpc_network',
-      'module.vpc_network.google_compute_router.nat_router',
-      'module.vpc_network.google_compute_router_nat.nat_manual',
-      'module.vpc_network.google_compute_subnetwork.reverse_proxy_subnetwork',
-    }.issubset(set(status_dict['resources'])):
-      status_dict['resources'].append('module.vpc_network')
-    if {
-      'module.webhook_agent.google_cloudfunctions_function.webhook',
-      'module.webhook_agent.google_storage_bucket.bucket',
-      'module.webhook_agent.google_storage_bucket_object.archive',
-      'module.webhook_agent.google_dialogflow_cx_agent.full_agent',
-    }.issubset(set(status_dict['resources'])):
-      status_dict['resources'].append('module.webhook_agent')
-    if {
-      'module.webhook_agent',
-      'module.vpc_network',
-      'module.services',
-      'module.service_directory',
-      'module.service_perimeter',
-    }.issubset(set(status_dict['resources'])):
-      status_dict['resources'].append('all')
-    print(status_dict['resources'])
-    return status_dict
-
-
-@app.route('/update_target', methods=['POST'])
-def update_target():
-  content = request.get_json(silent=True)
-  token_dict = get_token(request, token_type='access_token')
-  if 'response' in token_dict:
-    return token_dict['response']
-  access_token = token_dict['access_token']
-
-  project_id = request.args['project_id']
-  debug = request.args.get('debug')
-  targets = content.get('targets')
-  destroy = content['destroy']
-
-  if targets == ["all"]:
-    targets = None
-
-  c = context.Context()
-  module = '/app/deploy/terraform/main.tf'
-  prefix = f'terraform/{project_id}'
-  with tempfile.TemporaryDirectory() as workdir:
-
-    result = tf_init(c, module, workdir, access_token, prefix, debug)
-    if result: return result
-
-    result = tf_plan(c, module, workdir, access_token, debug)
-    if result: return result
-
-    if targets:
-      for target in targets:
-        result = tf_apply(c, module, workdir, access_token, debug, destroy, target=target)
-    else:
-        result = tf_apply(c, module, workdir, access_token, debug, destroy)
-    if result: return result
-
-    result = tf_state_list(c, module, workdir, access_token, debug)
-    if 'response' in result: return result["response"]
-    resources = result['resources']
-        
-    return Response(status=200, response=json.dumps({'status':'OK', 'resources':resources}, indent=2))
-
 
 @app.route('/validate_project_id', methods=['get'])
 def validate_project_id():
@@ -978,71 +783,120 @@ def validate_project_id():
     return Response(status=200, response=json.dumps({'status':False}, indent=2))
 
 
-@task
-def tf_unlock(c, module, workdir, access_token, debug, lock_id):
-  promise = c.run(f'\
-    cp {module} {workdir} &&\
-    export GOOGLE_OAUTH_ACCESS_TOKEN={access_token} &&\
-    terraform -chdir={workdir} force-unlock -force {lock_id}\
-  ', warn=True, hide=True, asynchronous=True)
-  result = promise.join()
 
+
+
+
+
+
+def get_terraform_env(access_token, request_args, debug=False):
+  env = {}
+  env["GOOGLE_OAUTH_ACCESS_TOKEN"] = access_token
+  env["TF_VAR_project_id"] = request_args["project_id"]
+  env["TF_VAR_bucket"] = request_args["bucket"]
+  env["TF_VAR_region"] = request_args["region"]
+  env["TF_VAR_access_policy_title"] = request_args["access_policy_title"]
   if debug:
-    print(result.exited)
-    print(result.stdout)
-    print(result.stderr)
+    env["TF_LOG"] = "DEBUG"
+  return env
 
-  if result.exited:
-    return Response(status=500, response=json.dumps({
-      'status': 'ERROR',
-      'stdout': result.stdout,
-      'stderr': result.stderr,
-    }))
+
+@app.route('/asset_status', methods=['GET'])
+def asset_status():
+  debug = request.args.get('debug') == 'true'
+  token_dict = get_token(request, token_type='access_token')
+  if 'response' in token_dict:
+    return token_dict['response']
+  access_token = token_dict['access_token']
+  env = get_terraform_env(access_token, request.args, debug=debug)
+
+
+  c = context.Context()
+  module = '/app/deploy/terraform/main.tf'
+  prefix = f'terraform/{request.args["project_id"]}'
+  with tempfile.TemporaryDirectory() as workdir:
+
+    result = tasks.tf_init(c, module, workdir, env, prefix, debug)
+    if result: return result
+
+    result = tasks.tf_plan(c, module, workdir, env, debug)
+    if result: return result
+
+    result = tasks.tf_state_list(c, module, workdir, env, debug)
+    if 'response' in result: return result["response"]
+    resources = result['resources']
+        
+    return Response(status=200, response=json.dumps({'status':'OK', 'resources':resources}, indent=2))
+
+
+@app.route('/update_target', methods=['POST'])
+def update_target():
+  content = request.get_json(silent=True)
+  token_dict = get_token(request, token_type='access_token')
+  if 'response' in token_dict:
+    return token_dict['response']
+  access_token = token_dict['access_token']
+
+  debug = request.args.get('debug') == 'true'
+  env = get_terraform_env(access_token, request.args, debug=debug)
+  targets = content.get('targets')
+  destroy = content['destroy']
+
+  if targets == ["all"]:
+    targets = None
+
+  c = context.Context()
+  module = '/app/deploy/terraform/main.tf'
+  prefix = f'terraform/{request.args["project_id"]}'
+  with tempfile.TemporaryDirectory() as workdir:
+
+    result = tasks.tf_init(c, module, workdir, env, prefix, debug)
+    if result: return result
+
+    result = tasks.tf_plan(c, module, workdir, env, debug)
+    if result: return result
+
+    if targets:
+      for target in targets:
+        result = tasks.tf_apply(c, module, workdir, env, debug, destroy, target=target)
+    else:
+        result = tasks.tf_apply(c, module, workdir, env, debug, destroy)
+    if result: return result
+
+    result = tasks.tf_state_list(c, module, workdir, env, debug)
+    if 'response' in result: return result["response"]
+    resources = result['resources']
+        
+    return Response(status=200, response=json.dumps({'status':'OK', 'resources':resources}, indent=2))
 
 
 @app.route('/unlock', methods=['post'])
 def unlock():
-  project_id = request.args['project_id']
-  debug = request.args.get('debug')
+  debug = request.args.get('debug') == 'true'
   content = request.get_json(silent=True)
   lock_id = content['lock_id']
   token_dict = get_token(request, token_type='access_token')
   if 'response' in token_dict:
     return token_dict['response']
   access_token = token_dict['access_token']
+  env = get_terraform_env(access_token, request.args)
 
   c = context.Context()
   module = '/app/deploy/terraform/main.tf'
-  prefix = f'terraform/{project_id}'
+  prefix = f'terraform/{request.args["project_id"]}'
   with tempfile.TemporaryDirectory() as workdir:
 
-    result = tf_init(c, module, workdir, access_token, prefix, debug)
+    result = tasks.tf_init(c, module, workdir, env, prefix, debug)
     if result: return result
 
-    result = tf_unlock(c, module, workdir, access_token, debug, lock_id)
+    result = tasks.tf_unlock(c, module, workdir, env, debug, lock_id)
     if result: return result
 
   return Response(status=200, response=json.dumps({'status':'OK'}, indent=2))
 
 
-@task
-def tf_import(c, module, workdir, access_token, debug, target, resource):
-  promise = c.run(f'\
-    cp {module} {workdir} &&\
-    export GOOGLE_OAUTH_ACCESS_TOKEN={access_token} &&\
-    terraform -chdir={workdir} import -var-file="/app/deploy/terraform/testing.tfvars" -var access_token=\'{access_token}\' "{target}" "{resource}"\
-  ', warn=True, hide=True, asynchronous=True)
-  result = promise.join()
-
-  if debug:
-    print(result.exited)
-    print(result.stdout)
-    print(result.stderr)
-
-
 @app.route('/import', methods=['post'])
 def import_resource():
-  project_id = request.args['project_id']
   target = request.args['target']
   debug = request.args.get('debug', True)
   content = request.get_json(silent=True)
@@ -1052,19 +906,17 @@ def import_resource():
   if 'response' in token_dict:
     return token_dict['response']
   access_token = token_dict['access_token']
-
+  env = get_terraform_env(access_token, request.args)
 
   c = context.Context()
   module = '/app/deploy/terraform/main.tf'
-  prefix = f'terraform/{project_id}'
+  prefix = f'terraform/{request.args["project_id"]}'
   with tempfile.TemporaryDirectory() as workdir:
 
-    result = tf_init(c, module, workdir, access_token, prefix, debug)
+    result = tasks.tf_init(c, module, workdir, env, prefix, debug)
     if result: return result
 
-    result = tf_import(c, module, workdir, access_token, debug, target, resource)
+    result = tasks.tf_import(c, module, workdir, env, debug, target, resource)
     if result: return result
 
   return Response(status=200, response=json.dumps({'status':'OK'}, indent=2))
-
-

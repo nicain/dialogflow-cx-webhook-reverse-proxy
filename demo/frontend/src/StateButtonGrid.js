@@ -66,7 +66,7 @@ function StateChangeButtonGrid(props){
   return (
     <>
       <Grid container direction='column' rowSpacing={1}>
-        {/* <Grid item>
+        <Grid item>
           {getControlElem("Webhook Access Authenticated Only?",
             webhookAccessState, 3, 110,
             "/webhook_access_allow_unauthenticated_status", 
@@ -80,7 +80,7 @@ function StateChangeButtonGrid(props){
           "/webhook_ingress_internal_only_status", 
           "/update_webhook_ingress", 
           cloudfunctionsRestrictedState, liveMode, dataModel, pageMapper, pageNumber)}
-        </Grid> */}
+        </Grid>
 
         <Grid item>
         {getControlElem("Restrict Cloudfunctions Access to VPC?",
@@ -90,21 +90,21 @@ function StateChangeButtonGrid(props){
           null, liveMode, dataModel, pageMapper, pageNumber)}
         </Grid>
 
-        {/* <Grid item>
+        <Grid item>
         {getControlElem("Restrict Dialogflow Access to VPC?",
           dialogflowRestrictedState, 15, null,
           "/restricted_services_status_dialogflow", 
           "/update_security_perimeter_dialogflow", 
           null, liveMode, dataModel, pageMapper, pageNumber)}
-        </Grid> */}
+        </Grid>
 
-        {/* <Grid item>
+        <Grid item>
         {getControlElem("Route Dialogflow Through VPC Proxy?",
           serviceDirectoryWebhookState, 8, 110,
           "/service_directory_webhook_fulfillment_status", 
           "/update_service_directory_webhook_fulfillment", 
           dialogflowRestrictedState, liveMode, dataModel, pageMapper, pageNumber)}
-        </Grid> */}
+        </Grid>
       </Grid>
     </>
 )}

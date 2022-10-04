@@ -11,16 +11,19 @@ variable "region" {
 variable "vpc_subnetwork" {
   description = "VPC Subnetwork"
   type        = string
+  default     = "webhook-subnet"
 }
 
 variable "vpc_network" {
   description = "VPC Network"
   type        = string
+  default     = "webhook-net"
 }
 
 variable "reverse_proxy_server_ip" {
   description = "reverse_proxy_server_ip"
   type        = string
+  default     = "10.10.20.2"
 }
 
 variable "compute_api" {

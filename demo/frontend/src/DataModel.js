@@ -4,6 +4,7 @@ import {TIMER_SCALE} from "./StatusPollToggle.js"
 const project_id_default = "vpc-sc-demo-nicholascain15";
 const webhook_name_default = "custom-telco-webhook";
 const region_default = "us-central1";
+const access_policy_title_default = "vpcsc_demo_policy";
 
 class ReversibleMap {
   constructor(map) {
@@ -76,16 +77,18 @@ function ProjectData () {
   const principal = {current: null, set: null};
   const webhook_name = {current: null, set: null};
   const region = {current: null, set: null};
+  const accessPolicyTitle = {current: null, set: null};
   [project_id.current, project_id.set] = useState(project_id_default);
   [webhook_name.current, webhook_name.set] = useState(webhook_name_default);
   [region.current, region.set] = useState(region_default);
   [principal.current, principal.set] = useState(null);
-
+  [accessPolicyTitle.current, accessPolicyTitle.set] = useState(access_policy_title_default);
   return {
     project_id: project_id,
     webhook_name: webhook_name,
     region: region,
     principal: principal,
+    accessPolicyTitle: accessPolicyTitle,
   }
 }
 
@@ -101,6 +104,7 @@ function AssetStatus() {
   const accesscontextmanagerService = {current: null, set: null};
   const vpcaccessService = {current: null, set: null};
   const appengineService = {current: null, set: null};
+  const cloudbillingService = {current: null, set: null};
   const network = {current: null, set: null};
   const subNetwork = {current: null, set: null};
   const natRouter = {current: null, set: null};
@@ -121,7 +125,7 @@ function AssetStatus() {
   const webhookAgent = {current: null, set:null};
   const allAssets = {current: null, set:null};
   const servicePerimeterModule = {current: null, set:null};
-  const accessPolicy = {current: null, set:null};
+  // const accessPolicy = {current: null, set:null};
   const servicePerimeter = {current: null, set:null};
 
   
@@ -140,6 +144,7 @@ function AssetStatus() {
   [accesscontextmanagerService.current, accesscontextmanagerService.set] = useState(null); 
   [vpcaccessService.current, vpcaccessService.set] = useState(null); 
   [appengineService.current, appengineService.set] = useState(null); 
+  [cloudbillingService.current, cloudbillingService.set] = useState(null); 
   [network.current, network.set] = useState(null);
   [subNetwork.current, subNetwork.set] = useState(null);
   [natRouter.current, natRouter.set] = useState(null);
@@ -160,7 +165,7 @@ function AssetStatus() {
   [webhookAgent.current, webhookAgent.set] = useState(null);
   [allAssets.current, allAssets.set] = useState(null);
   [servicePerimeterModule.current, servicePerimeterModule.set] = useState(null);
-  [accessPolicy.current, accessPolicy.set] = useState(null);
+  // [accessPolicy.current, accessPolicy.set] = useState(null);
   [servicePerimeter.current, servicePerimeter.set] = useState(null);
 
 
@@ -175,6 +180,7 @@ function AssetStatus() {
     "google_project_service.cloudbuild": cloudbuildService,
     "module.services.google_project_service.artifactregistry": artifactregistryService,
     "google_project_service.accesscontextmanager": accesscontextmanagerService,
+    "google_project_service.cloudbilling": cloudbillingService,
     "module.services.google_project_service.vpcaccess": vpcaccessService,
     "module.services.google_project_service.appengine": appengineService,
     "module.vpc_network": networkModule,
@@ -195,7 +201,7 @@ function AssetStatus() {
     "module.webhook_agent.google_cloudfunctions_function.webhook": webhookFunction,
     "module.webhook_agent.google_dialogflow_cx_agent.full_agent": webhookAgent,
     "module.service_perimeter": servicePerimeterModule,
-    "module.service_perimeter.google_access_context_manager_access_policy.access-policy":accessPolicy,
+    // "module.service_perimeter.google_access_context_manager_access_policy.access-policy":accessPolicy,
     "module.service_perimeter.google_access_context_manager_service_perimeter.service-perimeter":servicePerimeter,
     "all": allAssets,
   }
@@ -235,7 +241,7 @@ function DataModel () {
   [terraformLocked.current, terraformLocked.set] = useState(false);
   [validProjectId.current, validProjectId.set] = useState(false);
   [invertAssetCollectionSwitches.current, invertAssetCollectionSwitches.set] = useState(false);
-  [showServicesPanel.current, showServicesPanel.set] = useState(false);
+  [showServicesPanel.current, showServicesPanel.set] = useState(true);
   [sessionExpiredModalOpen.current, sessionExpiredModalOpen.set] = useState(false);
 
   const dataModel = {

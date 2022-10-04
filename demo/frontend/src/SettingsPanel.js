@@ -66,9 +66,29 @@ function ProjectIdInputField(props) {
       value={props.dataModel.projectData.project_id.current}
       onChange={onChange} 
       placeholder={props.label} 
-      disabled={props.disabled ? props.disabled: false}
       InputProps={{ spellCheck: 'false' }}
       color={textFieldColor}
+    />
+  )
+}
+
+function AccessPolicyField(props) {
+
+  function onChange(e) {
+    props.dataModel.projectData.accessPolicyTitle.set(e.target.value)
+  }
+
+  return (
+    <TextField 
+      sx={props.sx ? props.sx: {mx:2, width: 350}} 
+      label={props.label} 
+      variant="outlined" 
+      value={props.dataModel.projectData.accessPolicyTitle.current}
+      onChange={onChange} 
+      placeholder={props.label} 
+      InputProps={{ spellCheck: 'false' }}
+      disabled={props.dataModel.terraformLocked.current}
+      color="primary"
     />
   )
 }
@@ -87,6 +107,9 @@ function SettingsPanel(props) {
           <QueryClientProvider  client={queryClient}>
             <ProjectIdInputField label="Project ID" dataModel={props.dataModel}/>
           </QueryClientProvider>
+        </Grid>
+        <Grid item justifyContent="flex-start" alignItems="center"> 
+        <AccessPolicyField label="Access Policy Title" dataModel={props.dataModel}/>
         </Grid>
       </Grid>
     </div>

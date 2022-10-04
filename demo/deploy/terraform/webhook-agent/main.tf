@@ -11,6 +11,7 @@ variable "region" {
 variable "access_token" {
   description = "Access Token"
   type        = string
+  sensitive = true
 }
 
 variable "webhook_src" {
@@ -21,6 +22,7 @@ variable "webhook_src" {
 variable "webhook_name" {
   description = "webhook_name"
   type        = string
+  default     = "custom-telco-webhook"
 }
 
 variable "bucket" {

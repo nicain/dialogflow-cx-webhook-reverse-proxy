@@ -6,6 +6,7 @@ variable "project_id" {
 variable "access_token" {
   description = "Access Token"
   type        = string
+  sensitive = true
 }
 
 variable "region" {
@@ -21,52 +22,67 @@ variable "bucket" {
 variable "vpc_network" {
   description = "VPC Network Name"
   type        = string
+  default     = "webhook-net"
 }
 
 variable "vpc_subnetwork" {
   description = "Subnetwork for Reverse Proxy Server"
   type        = string
+  default     = "webhook-subnet"
 }
 
 variable "reverse_proxy_server_ip" {
   description = "IP Address of Reverse Proxy Servier"
   type        = string
+  default     = "10.10.20.2"
 }
 
 variable "service_directory_namespace" {
   description = "Service Directory Namespace"
   type        = string
+  default     = "df-namespace"
 }
 
 variable "service_directory_service" {
   description = "Service Directory Service"
   type        = string
+  default     = "df-service"
 }
 
 variable "service_directory_endpoint" {
   description = "Service Directory Endpoint"
   type        = string
+  default     = "df-endpoint"
 }
 
 variable "webhook_name" {
   description = "webhook_name"
   type        = string
+  default     = "custom-telco-webhook"
 }
 
 variable "webhook_src" {
   description = "webhook_src"
   type        = string
+  default = "/app/deploy/webhook-src"
 }
 
 variable "service_perimeter" {
   description = "Service Perimeter"
   type        = string
+  default     = "df_webhook"
+}
+
+variable "access_policy_title" {
+  description = "Access Policy"
+  type        = string
 }
 
 provider "google" {
   project     = var.project_id
+  billing_project     = var.project_id
   region      = var.region
-  # user_project_override = true
+  user_project_override = true
 }
 
 terraform {
@@ -116,6 +132,13 @@ resource "google_project_service" "cloudbuild" {
 
 resource "google_project_service" "accesscontextmanager" {
   service = "accesscontextmanager.googleapis.com"
+  project            = var.project_id
+  disable_on_destroy = false
+  disable_dependent_services = true
+}
+
+resource "google_project_service" "cloudbilling" {
+  service = "cloudbilling.googleapis.com"
   project            = var.project_id
   disable_on_destroy = false
   disable_dependent_services = true
@@ -174,4 +197,6 @@ module "service_perimeter" {
   project_id = var.project_id
   service_perimeter = var.service_perimeter
   accesscontextmanager_api = google_project_service.accesscontextmanager
+  access_policy_title = var.access_policy_title
+  cloudbilling_api = google_project_service.cloudbilling
 }

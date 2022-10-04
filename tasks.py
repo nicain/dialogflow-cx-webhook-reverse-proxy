@@ -973,7 +973,6 @@ def get_status(c,
     login_sa(c, sa_name, build_dir)
 
   status_dict = {}
-  # print('foo', settings["ACCESS_POLICY_NAME"].split('/')[1], settings["SECURITY_PERIMETER"])
 
   # Restricted Services:
   if restricted_services:

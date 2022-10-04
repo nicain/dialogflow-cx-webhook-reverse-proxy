@@ -6,7 +6,7 @@ import Paper from '@mui/material/Paper';
 function AssetStatusPanel(props) {
 
   const sx = {
-    height:500,
+    height:520,
     width: PANEL_WIDTH+100,
     px:1,
     py:1,

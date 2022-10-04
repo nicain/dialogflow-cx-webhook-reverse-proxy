@@ -39,14 +39,13 @@ function GetPrincipal(props) {
     href = `http://${window.location.host}/logout`
     loginEnabled = false
   }
-
   return (
   <div>
     <TextField 
       sx={{mx:2, width: 350, color: 'red'}}
-      label={"Principal"} 
+      label={(typeof(props.dataModel.projectData.principal.current)=== 'undefined' || props.dataModel.projectData.principal.current != null) ? "" : "Principal"} 
       variant="outlined" 
-      value={principal} 
+      value={props.dataModel.projectData.principal.current} 
       placeholder={"Principal"} 
       disabled={true}
 
@@ -62,9 +61,6 @@ function GetPrincipal(props) {
           </Tooltip>
         ),
       }}
-
-
-
     />
   </div>
   )

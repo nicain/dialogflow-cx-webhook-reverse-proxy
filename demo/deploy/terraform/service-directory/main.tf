@@ -11,26 +11,31 @@ variable "region" {
 variable "vpc_network" {
   description = "VPC Network"
   type        = string
+  default     = "webhook-net"
 }
 
 variable "service_directory_namespace" {
   description = "Service Directory Namespace"
   type        = string
+  default     = "df-namespace"
 }
 
 variable "service_directory_service" {
   description = "Service Directory Service"
   type        = string
+  default     = "df-service"
 }
 
 variable "service_directory_endpoint" {
   description = "Service Directory Endpoint"
   type        = string
+  default     = "df-endpoint"
 }
 
 variable "reverse_proxy_server_ip" {
   description = "reverse_proxy_server_ip"
   type        = string
+  default     = "10.10.20.2"
 }
 
 variable "service_directory_service_api" {

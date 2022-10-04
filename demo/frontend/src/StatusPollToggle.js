@@ -25,6 +25,7 @@ function ToggleStatus(props) {
       project_id: props.dataModel.projectData.project_id.current,
       region: props.dataModel.projectData.region.current,
       webhook_name: props.dataModel.projectData.webhook_name.current,
+      access_policy_title: props.dataModel.projectData.accessPolicyTitle.current,
     }})
     .then((res) => res.data),  {
       enabled:false, 
@@ -112,6 +113,7 @@ function PollStatus(props) {
       project_id: props.dataModel.projectData.project_id.current,
       region: props.dataModel.projectData.region.current,
       webhook_name: props.dataModel.projectData.webhook_name.current,
+      access_policy_title: props.dataModel.projectData.accessPolicyTitle.current,
     }})
     .then((res) => res.data)
   }
@@ -130,14 +132,16 @@ function PollStatus(props) {
     if (data && completed.current){
       completed.current = false;
       props.state.status.set(data.status)
-      console.log(data)
       if (data.status === 'BLOCKED') {
         props.state.blocked.set(true)
-        if (
+        if (data.reason==="POLICY_NOT_FOUND") {
+          props.state.status.set(false)
+        } else if (
           data.reason==='TOKEN_EXPIRED' & 
           props.dataModel.loggedIn.current & 
           !props.dataModel.sessionExpiredModalOpen.current
-        ) {
+          ) 
+        {
           handleTokenExpired(props.dataModel)
         }
       } else {

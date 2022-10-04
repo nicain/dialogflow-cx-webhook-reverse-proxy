@@ -30,9 +30,13 @@ function deleteCookie(name) {
 
 function handleTokenExpired(dataModel) {
   console.log('handleTokenExpired')
+  dataModel.projectData.principal.set(null)
   dataModel.sessionExpiredModalOpen.set(true)
   deleteCookie(LOGIN_COOKIE_NAME)
-  dataModel.projectData.principal.set(null)
 }
 
-export {backendEnabled, handleTokenExpired, getCookie, LOGIN_COOKIE_NAME}
+function getBucket(dataModel) {
+  return `${dataModel.projectData.project_id.current}-vpcsc-demo`
+}
+
+export {backendEnabled, handleTokenExpired, getCookie, LOGIN_COOKIE_NAME, getBucket}
