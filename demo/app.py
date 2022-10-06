@@ -707,6 +707,7 @@ def update_service_directory_webhook_fulfillment():
     fulfillment = 'generic-web-service'
 
   project_id = request.args['project_id']
+  bucket = request.args['bucket']
   region = request.args['region']
   webhook_name = request.args['webhook_name']
   service_directory_namespace = "df-namespace"
@@ -729,8 +730,8 @@ def update_service_directory_webhook_fulfillment():
       base64_bytes = base64.b64encode(msg_bytes)
       return base64_bytes.decode('ascii')
     credentials = google.oauth2.credentials.Credentials(token)  
-    BUCKET = storage.Client(project=project_id, credentials=credentials).bucket(project_id)
-    blob = storage.blob.Blob(f'ssl/server.der', BUCKET)
+    BUCKET = storage.Client(project=project_id, credentials=credentials).bucket(bucket)
+    blob = storage.blob.Blob(f'server.der', BUCKET)
     allowed_ca_cert = blob.download_as_string()
     data = {
       "displayName": "cxPrebuiltAgentsTelecom", 
@@ -796,8 +797,8 @@ def get_terraform_env(access_token, request_args, debug=False):
   env["TF_VAR_bucket"] = request_args["bucket"]
   env["TF_VAR_region"] = request_args["region"]
   env["TF_VAR_access_policy_title"] = request_args["access_policy_title"]
-  if debug:
-    env["TF_LOG"] = "DEBUG"
+  # if debug:
+  #   env["TF_LOG"] = "DEBUG"
   return env
 
 

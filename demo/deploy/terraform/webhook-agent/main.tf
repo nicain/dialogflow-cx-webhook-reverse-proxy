@@ -22,12 +22,6 @@ variable "webhook_src" {
 variable "webhook_name" {
   description = "webhook_name"
   type        = string
-  default     = "custom-telco-webhook"
-}
-
-variable "bucket" {
-  description = "bucket"
-  type        = string
 }
 
 variable "dialogflow_api" {
@@ -42,30 +36,28 @@ variable "cloudbuild_api" {
   type = object({})
 }
 
-locals {
-	root_dir = abspath("./")
-  archive_path = abspath("./tmp/function.zip")
-  region = var.region
+variable "bucket" {
+  type = object({})
 }
 
-resource "google_storage_bucket" "bucket" {
-  name     = var.bucket
-  location = "US"
-  project = var.project_id
-  force_destroy = true
+variable "bucket_name" {
+  description = "bucket_name"
+  type        = string
 }
 
-data "archive_file" "source" {
+data "archive_file" "webhook_source" {
   type        = "zip"
   source_dir  = var.webhook_src
-  output_path = local.archive_path
+  output_path = abspath("./tmp/webhook.zip")
 }
 
-resource "google_storage_bucket_object" "archive" {
-  name   = "index.zip"
-  bucket = google_storage_bucket.bucket.name
-  source = data.archive_file.source.output_path
-  depends_on = [data.archive_file.source]
+resource "google_storage_bucket_object" "webhook" {
+  name   = "webhook.zip"
+  bucket = var.bucket_name
+  source = data.archive_file.webhook_source.output_path
+  depends_on = [
+    var.bucket
+  ]
 }
 
 resource "time_sleep" "wait_for_apis" {
@@ -82,14 +74,15 @@ resource "google_cloudfunctions_function" "webhook" {
   description = "VPC-SC Demo Webhook"
   runtime     = "python39"
   available_memory_mb   = 128
-  source_archive_bucket = var.bucket
-  source_archive_object = google_storage_bucket_object.archive.name
+  source_archive_bucket = var.bucket_name
+  source_archive_object = google_storage_bucket_object.webhook.name
   trigger_http          = true
   timeout               = 60
   entry_point           = "cxPrebuiltAgentsTelecom"
   region = var.region
   depends_on = [
-    time_sleep.wait_for_apis
+    time_sleep.wait_for_apis,
+    var.bucket
   ]
 }
 
@@ -107,5 +100,4 @@ resource "google_dialogflow_cx_agent" "full_agent" {
   depends_on = [
     var.dialogflow_api
   ]
-
 }

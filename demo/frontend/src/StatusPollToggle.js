@@ -8,7 +8,7 @@ import {
 } from "react-router-dom";
 import {getPage} from './DataModel.js';
 import Tooltip from '@mui/material/Tooltip';
-import { backendEnabled, handleTokenExpired } from './Utilities.js';
+import { backendEnabled, handleTokenExpired, getBucket } from './Utilities.js';
 import Typography from '@mui/material/Typography';
 
 const TIMER_SCALE = 10;
@@ -23,6 +23,7 @@ function ToggleStatus(props) {
   axios
     .post(props.endpoint, {status: !props.state.status.current}, {params: {
       project_id: props.dataModel.projectData.project_id.current,
+      bucket:getBucket(props.dataModel),
       region: props.dataModel.projectData.region.current,
       webhook_name: props.dataModel.projectData.webhook_name.current,
       access_policy_title: props.dataModel.projectData.accessPolicyTitle.current,
@@ -111,6 +112,7 @@ function PollStatus(props) {
     return axios
     .get(props.endpoint, {params:{
       project_id: props.dataModel.projectData.project_id.current,
+      bucket:getBucket(props.dataModel),
       region: props.dataModel.projectData.region.current,
       webhook_name: props.dataModel.projectData.webhook_name.current,
       access_policy_title: props.dataModel.projectData.accessPolicyTitle.current,

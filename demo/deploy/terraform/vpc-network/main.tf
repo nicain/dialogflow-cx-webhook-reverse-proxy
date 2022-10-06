@@ -3,6 +3,17 @@ variable "project_id" {
   type        = string
 }
 
+variable "access_token" {
+  description = "Access Token"
+  type        = string
+  sensitive = true
+}
+
+variable "webhook_name" {
+  description = "webhook_name"
+  type        = string
+}
+
 variable "region" {
   description = "Region"
   type        = string
@@ -20,6 +31,11 @@ variable "vpc_network" {
   default     = "webhook-net"
 }
 
+variable "proxy_server_src" {
+  description = "proxy_server_src"
+  type        = string
+}
+
 variable "reverse_proxy_server_ip" {
   description = "reverse_proxy_server_ip"
   type        = string
@@ -28,6 +44,15 @@ variable "reverse_proxy_server_ip" {
 
 variable "compute_api" {
   type = object({})
+}
+
+variable "bucket" {
+  type = object({})
+}
+
+variable "bucket_name" {
+  description = "bucket_name"
+  type        = string
 }
 
 resource "google_compute_network" "vpc_network" {
@@ -75,7 +100,7 @@ resource "google_compute_firewall" "allow" {
   network = google_compute_network.vpc_network.name
   allow {
     protocol = "tcp"
-    ports    = ["443", "3389"]
+    ports    = ["443", "3389", "22"]
   }
   allow {
     protocol = "icmp"
@@ -99,4 +124,121 @@ resource "google_compute_address" "reverse_proxy_address" {
   purpose      = "GCE_ENDPOINT"
   region       = var.region
   address      = var.reverse_proxy_server_ip
+}
+
+data "google_project" "project" {
+  project_id     = var.project_id
+}
+
+data "archive_file" "proxy_server_source" {
+  type        = "zip"
+  source_dir  = var.proxy_server_src
+  output_path = abspath("./tmp/server.zip")
+}
+
+resource "google_storage_bucket_object" "proxy_server_source" {
+  name   = "server.zip"
+  bucket = var.bucket_name
+  source = data.archive_file.proxy_server_source.output_path
+  depends_on = [
+    var.bucket
+  ]
+}
+
+resource "google_pubsub_topic" "reverse_proxy_server_build" {
+  name = "build"
+}
+
+resource "google_artifact_registry_repository" "webhook_registry" {
+  location      = var.region
+  repository_id = "webhook-registry"
+  format        = "DOCKER"
+  project       = var.project_id
+}
+
+resource "google_cloudbuild_trigger" "reverse_proxy_server" {
+
+  pubsub_config {
+    topic = google_pubsub_topic.reverse_proxy_server_build.id
+  }
+
+  build {
+    source {
+      storage_source {
+        bucket = var.bucket_name
+        object = google_storage_bucket_object.proxy_server_source.name
+      }
+    }
+    
+    logs_bucket = "gs://${var.bucket_name}"
+
+    step {
+      name = "gcr.io/cloud-builders/docker"
+      timeout = "120s"
+      args = ["build", "--network", "cloudbuild", "--no-cache", "-t", "${var.region}-docker.pkg.dev/${var.project_id}/webhook-registry/webhook-server-image:latest", "."]
+    }
+    artifacts {
+      images = ["${var.region}-docker.pkg.dev/${var.project_id}/webhook-registry/webhook-server-image:latest"]
+    }
+  }
+  depends_on = [
+    google_artifact_registry_repository.webhook_registry,
+    var.bucket
+  ]
+
+  provisioner "local-exec" {
+    command = "export CLOUDSDK_AUTH_ACCESS_TOKEN=${var.access_token} && gcloud pubsub topics publish build --message=build"
+  }
+}
+
+resource "time_sleep" "wait_for_build" {
+  create_duration = "60s"
+  depends_on = [
+    google_cloudbuild_trigger.reverse_proxy_server
+  ]
+}
+
+resource "google_compute_instance" "reverse_proxy_server" {
+  name         = "webhook-server"
+  project      =  var.project_id
+  zone         = "${var.region}-a"
+  machine_type = "n1-standard-1"
+  tags = ["webhook-reverse-proxy-vm"]
+  service_account {
+    scopes = ["cloud-platform"]
+  }
+
+  boot_disk {
+    auto_delete = true
+    device_name = "instance-1"
+    mode = "READ_WRITE"
+    initialize_params {
+      image = "projects/debian-cloud/global/images/debian-10-buster-v20220719"
+      size = 10
+    }
+  }
+
+  network_interface {
+    network = google_compute_network.vpc_network.name
+    subnetwork = google_compute_subnetwork.reverse_proxy_subnetwork.name
+    network_ip = google_compute_address.reverse_proxy_address.address
+  }
+
+  metadata = {
+    bucket = var.bucket_name
+    image = "${var.region}-docker.pkg.dev/${var.project_id}/webhook-registry/webhook-server-image:latest"
+    bot_user = "service-${data.google_project.project.number}@gcp-sa-dialogflow.iam.gserviceaccount.com"
+    webhook_trigger_uri = "https://${var.region}-${var.project_id}.cloudfunctions.net/${var.webhook_name}"
+  }
+
+  metadata_startup_script = file("${path.module}/startup_script.sh")
+
+  provisioner "local-exec" {
+    command = "/app/deploy/terraform/vpc-network/wait_until_server_ready.sh --zone=${self.zone} --project_id=${var.project_id}  --token=${var.access_token}"
+  }
+  depends_on = [
+    time_sleep.wait_for_build,
+    var.bucket
+  ]
+  
 }

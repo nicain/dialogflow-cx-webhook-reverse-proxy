@@ -55,16 +55,16 @@ variable "service_directory_endpoint" {
   default     = "df-endpoint"
 }
 
-variable "webhook_name" {
-  description = "webhook_name"
-  type        = string
-  default     = "custom-telco-webhook"
-}
-
 variable "webhook_src" {
   description = "webhook_src"
   type        = string
   default = "/app/deploy/webhook-src"
+}
+
+variable "proxy_server_src" {
+  description = "proxy_server_src"
+  type        = string
+  default = "/app/deploy/proxy-server-src"
 }
 
 variable "service_perimeter" {
@@ -76,6 +76,12 @@ variable "service_perimeter" {
 variable "access_policy_title" {
   description = "Access Policy"
   type        = string
+}
+
+variable "webhook_name" {
+  description = "webhook_name"
+  type        = string
+  default     = "custom-telco-webhook"
 }
 
 provider "google" {
@@ -144,6 +150,13 @@ resource "google_project_service" "cloudbilling" {
   disable_dependent_services = true
 }
 
+resource "google_storage_bucket" "bucket" {
+  name     = var.bucket
+  location = "US"
+  project = var.project_id
+  force_destroy = true
+}
+
 module "services" {
   source = "/app/deploy/terraform/services"
   project_id = var.project_id
@@ -165,6 +178,11 @@ module "vpc_network" {
   vpc_subnetwork = var.vpc_subnetwork
   reverse_proxy_server_ip = var.reverse_proxy_server_ip
   compute_api = google_project_service.compute
+  proxy_server_src = var.proxy_server_src
+  access_token = var.access_token
+  bucket = google_storage_bucket.bucket
+  bucket_name = google_storage_bucket.bucket.name
+  webhook_name = var.webhook_name
 }
 
 module "service_directory" {
@@ -186,7 +204,8 @@ module "webhook_agent" {
   access_token = var.access_token
   webhook_src = var.webhook_src
   webhook_name = var.webhook_name
-  bucket = var.bucket
+  bucket = google_storage_bucket.bucket
+  bucket_name = google_storage_bucket.bucket.name
   dialogflow_api = google_project_service.dialogflow
   cloudfunctions_api = google_project_service.cloudfunctions
   cloudbuild_api = google_project_service.cloudbuild

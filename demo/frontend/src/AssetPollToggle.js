@@ -412,12 +412,12 @@ function ToggleAsset(props) {
 
   var visibility
   if (!props.dataModel.validProjectId.current || update.isFetching || tfImport.isFetching || typeof(asset.current) != "boolean" || props.dataModel.terraformLocked.current || asset.current==='BLOCKED') {
-    console.log("!props.dataModel.validProjectId.current", !props.dataModel.validProjectId.current) 
-    console.log("update.isFetching", update.isFetching)
-    console.log("tfImport.isFetching", tfImport.isFetching)
-    console.log("typeof(asset.current)", typeof(asset.current) != "boolean")
-    console.log("props.dataModel.terraformLocked.current", props.dataModel.terraformLocked.current)
-    console.log("asset.current", asset.current==='BLOCKED')
+    // console.log("!props.dataModel.validProjectId.current", !props.dataModel.validProjectId.current) 
+    // console.log("update.isFetching", update.isFetching)
+    // console.log("tfImport.isFetching", tfImport.isFetching)
+    // console.log("typeof(asset.current)", typeof(asset.current) != "boolean")
+    // console.log("props.dataModel.terraformLocked.current", props.dataModel.terraformLocked.current)
+    // console.log("asset.current", asset.current==='BLOCKED')
     visibility = "hidden"
   } else {
     visibility = "visible"
