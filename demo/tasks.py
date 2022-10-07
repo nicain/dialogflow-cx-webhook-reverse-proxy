@@ -112,46 +112,49 @@ def tf_state_list(c, module, workdir, env, debug):
   else:
     status_dict = {'resources': result.stdout.split()}
     if {
-      # 'module.service_perimeter.google_access_context_manager_access_policy.access-policy',
-      'module.service_perimeter.google_access_context_manager_service_perimeter.service-perimeter',
-    }.issubset(set(status_dict['resources'])):
-      status_dict['resources'].append('module.service_perimeter')
-    if {
-      'module.service_directory.data.google_project.project',
       'module.service_directory.google_service_directory_endpoint.reverse_proxy',
       'module.service_directory.google_service_directory_namespace.reverse_proxy',
       'module.service_directory.google_service_directory_service.reverse_proxy',
+      'module.service_perimeter.google_access_context_manager_service_perimeter.service_perimeter[0]',
     }.issubset(set(status_dict['resources'])):
       status_dict['resources'].append('module.service_directory')
     if {
-      'google_project_service.accesscontextmanager',
-      'google_project_service.cloudbilling',
       'module.services.google_project_service.appengine',
       'module.services.google_project_service.artifactregistry',
-      'google_project_service.cloudbuild',
-      'module.services.google_project_service.iam',
       'module.services.google_project_service.run',
-      'google_project_service.servicedirectory',
       'module.services.google_project_service.vpcaccess',
-      'google_project_service.compute',
+      'google_project_service.accesscontextmanager',
+      'google_project_service.cloudbilling',
+      'google_project_service.cloudbuild',
       'google_project_service.cloudfunctions',
+      'google_project_service.compute',
       'google_project_service.dialogflow',
+      'google_project_service.iam',
+      'google_project_service.servicedirectory',
     }.issubset(set(status_dict['resources'])):
       status_dict['resources'].append('module.services')
     if {
+      'module.vpc_network.google_artifact_registry_repository.webhook_registry',
+      'module.vpc_network.google_cloudbuild_trigger.reverse_proxy_server',
       'module.vpc_network.google_compute_address.reverse_proxy_address',
       'module.vpc_network.google_compute_firewall.allow',
       'module.vpc_network.google_compute_firewall.allow_dialogflow',
+      'module.vpc_network.google_compute_instance.reverse_proxy_server',
       'module.vpc_network.google_compute_network.vpc_network',
       'module.vpc_network.google_compute_router.nat_router',
       'module.vpc_network.google_compute_router_nat.nat_manual',
       'module.vpc_network.google_compute_subnetwork.reverse_proxy_subnetwork',
+      'module.vpc_network.google_project_iam_member.dfsa_sd_pscAuthorizedService',
+      'module.vpc_network.google_project_iam_member.dfsa_sd_viewer',
+      'module.vpc_network.google_project_service_identity.dfsa',
+      'module.vpc_network.google_pubsub_topic.reverse_proxy_server_build',
+      'module.vpc_network.google_storage_bucket_object.proxy_server_source',
     }.issubset(set(status_dict['resources'])):
       status_dict['resources'].append('module.vpc_network')
     if {
       'module.webhook_agent.google_cloudfunctions_function.webhook',
-      'module.webhook_agent.google_storage_bucket.bucket',
-      'module.webhook_agent.google_storage_bucket_object.archive',
+      'google_storage_bucket.bucket',
+      'module.webhook_agent.google_storage_bucket_object.webhook',
       'module.webhook_agent.google_dialogflow_cx_agent.full_agent',
     }.issubset(set(status_dict['resources'])):
       status_dict['resources'].append('module.webhook_agent')
@@ -160,7 +163,6 @@ def tf_state_list(c, module, workdir, env, debug):
       'module.vpc_network',
       'module.services',
       'module.service_directory',
-      'module.service_perimeter',
     }.issubset(set(status_dict['resources'])):
       status_dict['resources'].append('all')
     print(status_dict['resources'])

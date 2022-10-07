@@ -3,13 +3,6 @@ variable "project_id" {
   type        = string
 }
 
-resource "google_project_service" "iam" {
-  service = "iam.googleapis.com"
-  project            = var.project_id
-  disable_on_destroy = false
-  disable_dependent_services = true
-}
-
 resource "google_project_service" "run" {
   service = "run.googleapis.com"
   project            = var.project_id

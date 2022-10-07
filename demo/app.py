@@ -796,7 +796,10 @@ def get_terraform_env(access_token, request_args, debug=False):
   env["TF_VAR_project_id"] = request_args["project_id"]
   env["TF_VAR_bucket"] = request_args["bucket"]
   env["TF_VAR_region"] = request_args["region"]
-  env["TF_VAR_access_policy_title"] = request_args["access_policy_title"]
+  if "access_policy_title" in request_args:
+    env["TF_VAR_access_policy_title"] = request_args["access_policy_title"]
+  else:
+    env["TF_VAR_access_policy_title"] = 'null'
   # if debug:
   #   env["TF_LOG"] = "DEBUG"
   return env

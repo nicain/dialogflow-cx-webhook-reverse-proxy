@@ -1,10 +1,14 @@
 import {useState} from "react";
 import {TIMER_SCALE} from "./StatusPollToggle.js"
 
-const project_id_default = "vpc-sc-demo-nicholascain15";
-const webhook_name_default = "custom-telco-webhook";
 const region_default = "us-central1";
+const webhook_name_default = "custom-telco-webhook";
+
+const project_id_default = "vpc-sc-demo-nicholascain15";
 const access_policy_title_default = "vpcsc_demo_policy";
+
+// const project_id_default = "vpc-sc-demo-nicholascain17";
+// const access_policy_title_default = null;
 
 class ReversibleMap {
   constructor(map) {
@@ -125,13 +129,15 @@ function AssetStatus() {
   const webhookAgent = {current: null, set:null};
   const allAssets = {current: null, set:null};
   const servicePerimeterModule = {current: null, set:null};
-  // const accessPolicy = {current: null, set:null};
   const servicePerimeter = {current: null, set:null};
-
-  
-  
-  
-
+  const webhookRegistry = {current: null, set:null};
+  const buildTrigger = {current: null, set:null};
+  const proxyServer = {current: null, set:null};
+  const serviceAgent = {current: null, set:null};
+  const serviceAgentMemberA = {current: null, set:null};
+  const serviceAgentMemberB = {current: null, set:null};
+  const buildPubSub = {current: null, set:null};
+  const serverArchive = {current: null, set:null};
 
   [cloudfunctionService.current, cloudfunctionService.set] = useState(null);
   [dialogflowService.current, dialogflowService.set] = useState(null);
@@ -165,49 +171,59 @@ function AssetStatus() {
   [webhookAgent.current, webhookAgent.set] = useState(null);
   [allAssets.current, allAssets.set] = useState(null);
   [servicePerimeterModule.current, servicePerimeterModule.set] = useState(null);
-  // [accessPolicy.current, accessPolicy.set] = useState(null);
   [servicePerimeter.current, servicePerimeter.set] = useState(null);
+  [webhookRegistry.current, webhookRegistry.set] = useState(null);
+  [buildTrigger.current, buildTrigger.set] = useState(null);
+  [proxyServer.current, proxyServer.set] = useState(null);
+  [serviceAgent.current, serviceAgent.set] = useState(null);
+  [serviceAgentMemberA.current, serviceAgentMemberA.set] = useState(null);
+  [serviceAgentMemberB.current, serviceAgentMemberB.set] = useState(null);
+  [buildPubSub.current, buildPubSub.set] = useState(null);
+  [serverArchive.current, serverArchive.set] = useState(null);
 
 
   return {
     "module.services": servicesModule,
-    "google_project_service.cloudfunctions": cloudfunctionService,
-    "google_project_service.dialogflow": dialogflowService,
-    "google_project_service.compute": computeService,
-    "module.services.google_project_service.iam": iamService,
-    "google_project_service.servicedirectory": servicedirectoryService,
-    "module.services.google_project_service.run": runService,
-    "google_project_service.cloudbuild": cloudbuildService,
+    "module.services.google_project_service.appengine": appengineService,
     "module.services.google_project_service.artifactregistry": artifactregistryService,
+    "module.services.google_project_service.run": runService,
+    "module.services.google_project_service.vpcaccess": vpcaccessService,
     "google_project_service.accesscontextmanager": accesscontextmanagerService,
     "google_project_service.cloudbilling": cloudbillingService,
-    "module.services.google_project_service.vpcaccess": vpcaccessService,
-    "module.services.google_project_service.appengine": appengineService,
+    "google_project_service.cloudbuild": cloudbuildService,
+    "google_project_service.cloudfunctions": cloudfunctionService,
+    "google_project_service.compute": computeService,
+    "google_project_service.dialogflow": dialogflowService,
+    "google_project_service.iam": iamService,
+    "google_project_service.servicedirectory": servicedirectoryService,
     "module.vpc_network": networkModule,
+    "module.vpc_network.google_artifact_registry_repository.webhook_registry": webhookRegistry,
+    "module.vpc_network.google_cloudbuild_trigger.reverse_proxy_server": buildTrigger, 
+    "module.vpc_network.google_compute_address.reverse_proxy_address": proxyAddress,
+    "module.vpc_network.google_compute_firewall.allow": firewallAllow,
+    "module.vpc_network.google_compute_firewall.allow_dialogflow": firewallDialogflow,
+    "module.vpc_network.google_compute_instance.reverse_proxy_server": proxyServer,
     "module.vpc_network.google_compute_network.vpc_network": network,
-    "module.vpc_network.google_compute_subnetwork.reverse_proxy_subnetwork": subNetwork,
     "module.vpc_network.google_compute_router.nat_router": natRouter,
     "module.vpc_network.google_compute_router_nat.nat_manual": natManual,
-    "module.vpc_network.google_compute_firewall.allow_dialogflow": firewallDialogflow,
-    "module.vpc_network.google_compute_firewall.allow": firewallAllow,
-    "module.vpc_network.google_compute_address.reverse_proxy_address": proxyAddress,
+    "module.vpc_network.google_compute_subnetwork.reverse_proxy_subnetwork": subNetwork,
+    "module.vpc_network.google_project_service_identity.dfsa": serviceAgent,
+    "module.vpc_network.google_project_iam_member.dfsa_sd_pscAuthorizedService": serviceAgentMemberA,
+    "module.vpc_network.google_project_iam_member.dfsa_sd_viewer": serviceAgentMemberB,
+    "module.vpc_network.google_pubsub_topic.reverse_proxy_server_build": buildPubSub,
+    "module.vpc_network.google_storage_bucket_object.proxy_server_source": serverArchive,
     "module.service_directory": serviceDirectoryModule,
     "module.service_directory.google_service_directory_namespace.reverse_proxy": proxyNamespace,
     "module.service_directory.google_service_directory_service.reverse_proxy": proxyService,
     "module.service_directory.google_service_directory_endpoint.reverse_proxy": proxyEndpoint,
+    "module.service_perimeter.google_access_context_manager_service_perimeter.service_perimeter[0]": servicePerimeter,
     "module.webhook_agent": webhookAgentModule,
-    "module.webhook_agent.google_storage_bucket.bucket": storageBucket,
-    "module.webhook_agent.google_storage_bucket_object.archive": webhookArchive,
-    "module.webhook_agent.google_cloudfunctions_function.webhook": webhookFunction,
+    "google_storage_bucket.bucket": storageBucket,
     "module.webhook_agent.google_dialogflow_cx_agent.full_agent": webhookAgent,
-    "module.service_perimeter": servicePerimeterModule,
-    // "module.service_perimeter.google_access_context_manager_access_policy.access-policy":accessPolicy,
-    "module.service_perimeter.google_access_context_manager_service_perimeter.service-perimeter":servicePerimeter,
+    "module.webhook_agent.google_storage_bucket_object.webhook": webhookArchive,
+    "module.webhook_agent.google_cloudfunctions_function.webhook": webhookFunction,
     "all": allAssets,
   }
-
-  
-
 }
 
 function DataModel () {

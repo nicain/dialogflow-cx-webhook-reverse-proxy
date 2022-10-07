@@ -1,4 +1,4 @@
-import {ServicesPanel, NetworkPanel, AgentPanel, ServiceDirectoryPanel, ServicePerimeterPanel, PANEL_WIDTH} from './AssetPollToggle.js'
+import {ServicesPanel, NetworkPanel, AgentPanel, ServiceDirectoryPanel, PANEL_WIDTH} from './AssetPollToggle.js'
 import Grid from '@mui/material/Grid';
 import Paper from '@mui/material/Paper';
 
@@ -6,7 +6,7 @@ import Paper from '@mui/material/Paper';
 function AssetStatusPanel(props) {
 
   const sx = {
-    height:520,
+    height:600,
     width: PANEL_WIDTH+100,
     px:1,
     py:1,
@@ -42,11 +42,6 @@ function AssetStatusPanel(props) {
         <Grid item>
           <Paper variant="outlined" sx={sx}>
             <AgentPanel dataModel={props.dataModel}/>
-          </Paper>
-        </Grid>
-        <Grid item>
-          <Paper variant="outlined" sx={sx}>
-            <ServicePerimeterPanel dataModel={props.dataModel}/>
           </Paper>
         </Grid>
         {ServicesPanelObj}

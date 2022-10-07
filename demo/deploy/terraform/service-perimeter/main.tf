@@ -26,7 +26,8 @@ data "google_project" "project" {
   project_id     = var.project_id
 }
 
-resource "google_access_context_manager_access_policy" "access-policy" {
+resource "google_access_context_manager_access_policy" "access_policy" {
+  count = var.access_policy_title=="null" ? 0 : 1
   parent = "organizations/${data.google_project.project.org_id}"
   title  = var.access_policy_title
   scopes = ["projects/${data.google_project.project.number}"]
@@ -37,9 +38,10 @@ resource "google_access_context_manager_access_policy" "access-policy" {
 }
 
 
-resource "google_access_context_manager_service_perimeter" "service-perimeter" {
-  parent = "accessPolicies/${google_access_context_manager_access_policy.access-policy.name}"
-  name   = "accessPolicies/${google_access_context_manager_access_policy.access-policy.name}/servicePerimeters/${var.service_perimeter}"
+resource "google_access_context_manager_service_perimeter" "service_perimeter" {
+  count = var.access_policy_title=="null" ? 0 : 1
+  parent = "accessPolicies/${google_access_context_manager_access_policy.access_policy[0].name}"
+  name   = "accessPolicies/${google_access_context_manager_access_policy.access_policy[0].name}/servicePerimeters/${var.service_perimeter}"
   title  = var.service_perimeter
   status {
     resources = [

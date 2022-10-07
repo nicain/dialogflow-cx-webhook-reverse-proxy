@@ -25,8 +25,8 @@ function ResourceCollectionDeployment(target, dataModel) {
   var valueList
   if (target==="module.webhook_agent") {
     valueList = [
-      dataModel.assetStatus["module.webhook_agent.google_storage_bucket.bucket"].current===true ? 1 : 0,
-      dataModel.assetStatus["module.webhook_agent.google_storage_bucket_object.archive"].current===true ? 1 : 0,
+      dataModel.assetStatus["google_storage_bucket.bucket"].current===true ? 1 : 0,
+      dataModel.assetStatus["module.webhook_agent.google_storage_bucket_object.webhook"].current===true ? 1 : 0,
       dataModel.assetStatus["module.webhook_agent.google_cloudfunctions_function.webhook"].current===true ? 1 : 0,
       dataModel.assetStatus["module.webhook_agent.google_dialogflow_cx_agent.full_agent"].current===true ? 1 : 0,
     ]
@@ -35,23 +35,32 @@ function ResourceCollectionDeployment(target, dataModel) {
       dataModel.assetStatus["module.service_directory.google_service_directory_namespace.reverse_proxy"].current===true ? 1 : 0,
       dataModel.assetStatus["module.service_directory.google_service_directory_service.reverse_proxy"].current===true ? 1 : 0,
       dataModel.assetStatus["module.service_directory.google_service_directory_endpoint.reverse_proxy"].current===true ? 1 : 0,
+      dataModel.assetStatus["module.service_perimeter.google_access_context_manager_service_perimeter.service_perimeter[0]"].current===true ? 1 : 0,
     ]
   } else if (target==="module.vpc_network") {
     valueList = [
+      dataModel.assetStatus["module.vpc_network.google_artifact_registry_repository.webhook_registry"].current===true ? 1 : 0,
+      dataModel.assetStatus["module.vpc_network.google_cloudbuild_trigger.reverse_proxy_server"].current===true ? 1 : 0,
+      dataModel.assetStatus["module.vpc_network.google_compute_address.reverse_proxy_address"].current===true ? 1 : 0,
+      dataModel.assetStatus["module.vpc_network.google_compute_firewall.allow"].current===true ? 1 : 0,
+      dataModel.assetStatus["module.vpc_network.google_compute_firewall.allow_dialogflow"].current===true ? 1 : 0,
+      dataModel.assetStatus["module.vpc_network.google_compute_instance.reverse_proxy_server"].current===true ? 1 : 0,
       dataModel.assetStatus["module.vpc_network.google_compute_network.vpc_network"].current===true ? 1 : 0,
-      dataModel.assetStatus["module.vpc_network.google_compute_subnetwork.reverse_proxy_subnetwork"].current===true ? 1 : 0,
       dataModel.assetStatus["module.vpc_network.google_compute_router.nat_router"].current===true ? 1 : 0,
       dataModel.assetStatus["module.vpc_network.google_compute_router_nat.nat_manual"].current===true ? 1 : 0,
-      dataModel.assetStatus["module.vpc_network.google_compute_firewall.allow_dialogflow"].current===true ? 1 : 0,
-      dataModel.assetStatus["module.vpc_network.google_compute_firewall.allow"].current===true ? 1 : 0,
-      dataModel.assetStatus["module.vpc_network.google_compute_address.reverse_proxy_address"].current===true ? 1 : 0,
+      dataModel.assetStatus["module.vpc_network.google_compute_subnetwork.reverse_proxy_subnetwork"].current===true ? 1 : 0,
+      dataModel.assetStatus["module.vpc_network.google_project_iam_member.dfsa_sd_pscAuthorizedService"].current===true ? 1 : 0,
+      dataModel.assetStatus["module.vpc_network.google_project_iam_member.dfsa_sd_viewer"].current===true ? 1 : 0,
+      dataModel.assetStatus["module.vpc_network.google_project_service_identity.dfsa"].current===true ? 1 : 0,
+      dataModel.assetStatus["module.vpc_network.google_pubsub_topic.reverse_proxy_server_build"].current===true ? 1 : 0,
+      dataModel.assetStatus["module.vpc_network.google_storage_bucket_object.proxy_server_source"].current===true ? 1 : 0,
     ]
   } else if (target==="module.services") {
     valueList = [
       dataModel.assetStatus["google_project_service.dialogflow"].current===true ? 1 : 0,
       dataModel.assetStatus["google_project_service.cloudfunctions"].current===true ? 1 : 0,
       dataModel.assetStatus["google_project_service.compute"].current===true ? 1 : 0,
-      dataModel.assetStatus["module.services.google_project_service.iam"].current===true ? 1 : 0,
+      dataModel.assetStatus["google_project_service.iam"].current===true ? 1 : 0,
       dataModel.assetStatus["google_project_service.servicedirectory"].current===true ? 1 : 0,
       dataModel.assetStatus["module.services.google_project_service.run"].current===true ? 1 : 0,
       dataModel.assetStatus["google_project_service.cloudbuild"].current===true ? 1 : 0,
@@ -61,12 +70,7 @@ function ResourceCollectionDeployment(target, dataModel) {
       dataModel.assetStatus["module.services.google_project_service.vpcaccess"].current===true ? 1 : 0,
       dataModel.assetStatus["module.services.google_project_service.appengine"].current===true ? 1 : 0,
     ]
-  } else if (target==="module.service_perimeter") {
-    valueList = [
-      // dataModel.assetStatus["module.service_perimeter.google_access_context_manager_access_policy.access-policy"].current===true ? 1 : 0,
-      dataModel.assetStatus["module.service_perimeter.google_access_context_manager_service_perimeter.service-perimeter"].current===true ? 1 : 0,
-    ]
-  }
+  } 
   return {
     deployed: valueList.reduce((a, b) => a + b, 0),
     count: valueList.length,
@@ -74,7 +78,7 @@ function ResourceCollectionDeployment(target, dataModel) {
 }
 
 function ResourceCollectionIsAllSame(target, dataModel) {
-  const modules = ["module.webhook_agent", "module.service_directory", "module.vpc_network", "module.services", "module.service_perimeter"];
+  const modules = ["module.webhook_agent", "module.service_directory", "module.vpc_network", "module.services"];
   if (modules.includes(target)) {
     const deployment = ResourceCollectionDeployment(target, dataModel)
     return (deployment['deployed'] === 0) || (deployment['count'] === deployment['deployed'])
@@ -305,6 +309,7 @@ function ToggleAsset(props) {
         "google_project_service.cloudbuild",
         "google_project_service.accesscontextmanager",
         "google_project_service.cloudbilling",
+        "google_project_service.iam",
       ];
     } else {
       target = [props.target]
@@ -581,8 +586,8 @@ function bucketLink(bucket) {
   return `https://console.cloud.google.com/storage/browser/${bucket}`
 }
 
-function archiveLink(bucket) {
-  return `https://console.cloud.google.com/storage/browser/_details/${bucket}/index.zip`
+function archiveLink(bucket, filename) {
+  return `https://console.cloud.google.com/storage/browser/_details/${bucket}/${filename}`
 }
 
 function webhookLink(project_id, region) {
@@ -629,8 +634,25 @@ function addressesLink(project_id) {
   return `https://console.cloud.google.com/networking/addresses/list?orgonly=true&project=${project_id}&supportedpurview=organizationId`
 }
 
+function registryLink(project_id, region) {
+  return `https://console.cloud.google.com/artifacts/docker/${project_id}/${region}/webhook-registry`
+}
 
+function buildHistoryLink(project_id) {
+  return `https://console.cloud.google.com/cloud-build/builds?project=${project_id}`
+}
 
+function buildTriggerLink(project_id) {
+  return `https://console.cloud.google.com/cloudpubsub/topic/detail/build?project=${project_id}`
+}
+
+function proxyServerLink(project_id, region) {
+  return `https://console.cloud.google.com/compute/instancesDetail/zones/${region}-a/instances/webhook-server?project=${project_id}`
+}
+
+function serviceIdentityLink(project_id) {
+  return `https://console.cloud.google.com/iam-admin/iam?project=${project_id}`
+}
 
 
 function ServicesPanel (props) {
@@ -648,7 +670,7 @@ function ServicesPanel (props) {
         <QueryToggleAsset name="dialogflow" target="google_project_service.dialogflow" dataModel={props.dataModel} href={servicesLink("dialogflow", project_id)}/>
         <QueryToggleAsset name="cloudfunctions" target="google_project_service.cloudfunctions" dataModel={props.dataModel}  href={servicesLink("cloudfunctions", project_id)}/>
         <QueryToggleAsset name="compute" target="google_project_service.compute" dataModel={props.dataModel}  href={servicesLink("compute", project_id)}/>
-        <QueryToggleAsset name="iam" target="module.services.google_project_service.iam" dataModel={props.dataModel}  href={servicesLink("iam", project_id)}/>
+        <QueryToggleAsset name="iam" target="google_project_service.iam" dataModel={props.dataModel}  href={servicesLink("iam", project_id)}/>
         <QueryToggleAsset name="servicedirectory" target="google_project_service.servicedirectory" dataModel={props.dataModel}  href={servicesLink("servicedirectory", project_id)}/>
         <QueryToggleAsset name="run" target="module.services.google_project_service.run" dataModel={props.dataModel}  href={servicesLink("run", project_id)}/>
         <QueryToggleAsset name="cloudbuild" target="google_project_service.cloudbuild" dataModel={props.dataModel}  href={servicesLink("cloudbuild", project_id)}/>
@@ -665,6 +687,7 @@ function ServicesPanel (props) {
 function NetworkPanel (props) {
   const project_id = props.dataModel.projectData.project_id.current;
   const region = props.dataModel.projectData.region.current;
+  const bucket = getBucket(props.dataModel);
   return (
     <>
       <Grid container direction='row' justifyContent="space-between">
@@ -682,11 +705,19 @@ function NetworkPanel (props) {
         <QueryToggleAsset name="Firewall: General" target="module.vpc_network.google_compute_firewall.allow" dataModel={props.dataModel} href={firewallLink('allow', project_id)}/>
         <QueryToggleAsset name="Firewall: Dialogflow" target="module.vpc_network.google_compute_firewall.allow_dialogflow" dataModel={props.dataModel} href={firewallLink('allow-dialogflow', project_id)}/>
         <QueryToggleAsset name="Address" target="module.vpc_network.google_compute_address.reverse_proxy_address" dataModel={props.dataModel} href={addressesLink(project_id)}/>
+        <QueryToggleAsset name="Artifact Registry" target="module.vpc_network.google_artifact_registry_repository.webhook_registry" dataModel={props.dataModel} href={registryLink(project_id, region)}/>
+        <QueryToggleAsset name="Server Source" target="module.vpc_network.google_storage_bucket_object.proxy_server_source" dataModel={props.dataModel} href={archiveLink(bucket, 'server.zip')}/>
+        <QueryToggleAsset name="Build History" target="module.vpc_network.google_cloudbuild_trigger.reverse_proxy_server" dataModel={props.dataModel} href={buildHistoryLink(project_id)}/>
+        <QueryToggleAsset name="Build Trigger" target="module.vpc_network.google_pubsub_topic.reverse_proxy_server_build" dataModel={props.dataModel} href={buildTriggerLink(project_id)}/>
+        <QueryToggleAsset name="Proxy Server" target="module.vpc_network.google_compute_instance.reverse_proxy_server" dataModel={props.dataModel} href={proxyServerLink(project_id, region)}/>
+        <QueryToggleAsset name="Service Identity" target="module.vpc_network.google_project_service_identity.dfsa" dataModel={props.dataModel} href={serviceIdentityLink(project_id)}/>
       </Grid>
     </>
   )
 }
 
+{/* <QueryToggleAsset name="TODO" target="module.vpc_network.google_project_iam_member.dfsa_sd_pscAuthorizedService" dataModel={props.dataModel} href={"TODO"}/>
+<QueryToggleAsset name="TODO" target="module.vpc_network.google_project_iam_member.dfsa_sd_viewer" dataModel={props.dataModel} href={"TODO"}/> */}
 
 function ServiceDirectoryPanel (props) {
   const project_id = props.dataModel.projectData.project_id.current;
@@ -704,6 +735,7 @@ function ServiceDirectoryPanel (props) {
         <QueryToggleAsset name="Namespace" target="module.service_directory.google_service_directory_namespace.reverse_proxy" dataModel={props.dataModel} href={namespaceLink(project_id, region)}/>
         <QueryToggleAsset name="Service" target="module.service_directory.google_service_directory_service.reverse_proxy" dataModel={props.dataModel} href={serviceLink(project_id, region)}/>
         <QueryToggleAsset name="Endpoint" target="module.service_directory.google_service_directory_endpoint.reverse_proxy" dataModel={props.dataModel} href={endpointLink(project_id, region)}/>
+        <QueryToggleAsset name="Service Perimeter" target="module.service_perimeter.google_access_context_manager_service_perimeter.service_perimeter[0]" dataModel={props.dataModel} href={servicePerimeterLink(project_id, region)}/>
       </Grid>
     </>
   )
@@ -723,8 +755,8 @@ function AgentPanel (props) {
       </Grid>
       <Divider sx={{ my:1 }} orientation="horizontal" flexItem/>
       <Grid container  justifyContent="flex-end">
-        <QueryToggleAsset name="Storage Bucket" target="module.webhook_agent.google_storage_bucket.bucket" dataModel={props.dataModel} href={bucketLink(bucket)}/>
-        <QueryToggleAsset name="Webhook Source" target="module.webhook_agent.google_storage_bucket_object.archive" dataModel={props.dataModel} href={archiveLink(bucket)}/>
+        <QueryToggleAsset name="Storage Bucket" target="google_storage_bucket.bucket" dataModel={props.dataModel} href={bucketLink(bucket)}/>
+        <QueryToggleAsset name="Webhook Source" target="module.webhook_agent.google_storage_bucket_object.webhook" dataModel={props.dataModel} href={archiveLink(bucket, 'webhook.zip')}/>
         <QueryToggleAsset name="Webhook Function" target="module.webhook_agent.google_cloudfunctions_function.webhook" dataModel={props.dataModel} href={webhookLink(project_id, region)}/>
         <QueryToggleAsset name="Dialogflow Agent" target="module.webhook_agent.google_dialogflow_cx_agent.full_agent" dataModel={props.dataModel} href={agentLink(project_id, region)}/>
       </Grid>
@@ -733,26 +765,4 @@ function AgentPanel (props) {
 }
 
 
-
-
-
-function ServicePerimeterPanel (props) {
-  const project_id = props.dataModel.projectData.project_id.current;
-  return (
-    <>
-      <Grid container direction='row' justifyContent="space-between">
-        <Typography variant="h6">
-        Service Perimeter:
-        </Typography> 
-        <QueryToggleAsset target="module.service_perimeter" dataModel={props.dataModel} enableAlert={false} includeNameBox={true} isModuleSwitch={true}/>
-      </Grid>
-      <Divider sx={{ my:1 }} orientation="horizontal" flexItem/>
-      <Grid container  justifyContent="flex-end">
-        {/* <QueryToggleAsset name="Access Policy" target="module.service_perimeter.google_access_context_manager_access_policy.access-policy" dataModel={props.dataModel} enableAlert={false}/> */}
-        <QueryToggleAsset name="Service Perimeter" target="module.service_perimeter.google_access_context_manager_service_perimeter.service-perimeter" dataModel={props.dataModel}  href={servicePerimeterLink(project_id)}/>
-      </Grid>
-    </>
-  )
-}
-
-export {ServicesPanel, NetworkPanel, AgentPanel, QueryPollAssetStatus, QueryToggleAsset, ServiceDirectoryPanel, ServicePerimeterPanel, PANEL_WIDTH}
+export {ServicesPanel, NetworkPanel, AgentPanel, QueryPollAssetStatus, QueryToggleAsset, ServiceDirectoryPanel, PANEL_WIDTH}

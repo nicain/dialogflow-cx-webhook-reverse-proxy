@@ -50,6 +50,14 @@ variable "bucket" {
   type = object({})
 }
 
+variable "iam_api" {
+  type = object({})
+}
+
+variable "dialogflow_api" {
+  type = object({})
+}
+
 variable "bucket_name" {
   description = "bucket_name"
   type        = string
@@ -187,7 +195,7 @@ resource "google_cloudbuild_trigger" "reverse_proxy_server" {
   ]
 
   provisioner "local-exec" {
-    command = "export CLOUDSDK_AUTH_ACCESS_TOKEN=${var.access_token} && gcloud pubsub topics publish build --message=build"
+    command = "export CLOUDSDK_AUTH_ACCESS_TOKEN=${var.access_token} && gcloud --project=${var.project_id} pubsub topics publish build --message=build"
   }
 }
 
@@ -196,6 +204,28 @@ resource "time_sleep" "wait_for_build" {
   depends_on = [
     google_cloudbuild_trigger.reverse_proxy_server
   ]
+}
+
+resource "google_project_service_identity" "dfsa" {
+  provider = google-beta
+  project = var.project_id
+  service = "dialogflow.googleapis.com"
+  depends_on = [
+    var.iam_api,
+    var.dialogflow_api,
+  ]
+}
+
+resource "google_project_iam_member" "dfsa_sd_viewer" {
+  project = var.project_id
+  role               = "roles/servicedirectory.viewer"
+  member = "serviceAccount:${google_project_service_identity.dfsa.email}"
+}
+
+resource "google_project_iam_member" "dfsa_sd_pscAuthorizedService" {
+  project = var.project_id
+  role               = "roles/servicedirectory.pscAuthorizedService"
+  member = "serviceAccount:${google_project_service_identity.dfsa.email}"
 }
 
 resource "google_compute_instance" "reverse_proxy_server" {
@@ -227,7 +257,7 @@ resource "google_compute_instance" "reverse_proxy_server" {
   metadata = {
     bucket = var.bucket_name
     image = "${var.region}-docker.pkg.dev/${var.project_id}/webhook-registry/webhook-server-image:latest"
-    bot_user = "service-${data.google_project.project.number}@gcp-sa-dialogflow.iam.gserviceaccount.com"
+    bot_user = google_project_service_identity.dfsa.email
     webhook_trigger_uri = "https://${var.region}-${var.project_id}.cloudfunctions.net/${var.webhook_name}"
   }
 
@@ -238,7 +268,9 @@ resource "google_compute_instance" "reverse_proxy_server" {
   }
   depends_on = [
     time_sleep.wait_for_build,
-    var.bucket
+    var.bucket,
+    google_project_iam_member.dfsa_sd_viewer,
+    google_project_iam_member.dfsa_sd_pscAuthorizedService,
   ]
   
 }

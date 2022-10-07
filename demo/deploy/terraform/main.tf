@@ -75,6 +75,7 @@ variable "service_perimeter" {
 
 variable "access_policy_title" {
   description = "Access Policy"
+  default = "null"
   type        = string
 }
 
@@ -150,6 +151,13 @@ resource "google_project_service" "cloudbilling" {
   disable_dependent_services = true
 }
 
+resource "google_project_service" "iam" {
+  service = "iam.googleapis.com"
+  project            = var.project_id
+  disable_on_destroy = false
+  disable_dependent_services = true
+}
+
 resource "google_storage_bucket" "bucket" {
   name     = var.bucket
   location = "US"
@@ -178,6 +186,8 @@ module "vpc_network" {
   vpc_subnetwork = var.vpc_subnetwork
   reverse_proxy_server_ip = var.reverse_proxy_server_ip
   compute_api = google_project_service.compute
+  iam_api = google_project_service.iam
+  dialogflow_api = google_project_service.dialogflow
   proxy_server_src = var.proxy_server_src
   access_token = var.access_token
   bucket = google_storage_bucket.bucket
