@@ -4,11 +4,14 @@ import {TIMER_SCALE} from "./StatusPollToggle.js"
 const region_default = "us-central1";
 const webhook_name_default = "custom-telco-webhook";
 
-const project_id_default = "vpc-sc-demo-nicholascain15";
-const access_policy_title_default = "vpcsc_demo_policy";
+// const project_id_default = "vpc-sc-demo-nicholascain15";
+// const access_policy_title_default = "vpcsc_demo_policy";
 
 // const project_id_default = "vpc-sc-demo-nicholascain17";
 // const access_policy_title_default = null;
+
+const project_id_default = null;
+const access_policy_title_default = null;
 
 class ReversibleMap {
   constructor(map) {

@@ -311,6 +311,16 @@ function ToggleAsset(props) {
         "google_project_service.cloudbilling",
         "google_project_service.iam",
       ];
+    } else if (props.target==="module.service_directory" && destroy) {
+      target = [
+        props.target, 
+        "module.service_perimeter.google_access_context_manager_service_perimeter.service_perimeter[0]",
+      ];
+    } else if (props.target==="module.webhook_agent" && destroy) {
+      target = [
+        props.target, 
+        "google_storage_bucket.bucket",
+      ];
     } else {
       target = [props.target]
     }
