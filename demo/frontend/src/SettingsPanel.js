@@ -93,6 +93,21 @@ function AccessPolicyField(props) {
   )
 }
 
+function RegionField(props) {
+  return (
+    <TextField 
+      sx={props.sx ? props.sx: {mx:2, width: 350}} 
+      label={props.label} 
+      variant="outlined" 
+      value={props.dataModel.projectData.region.current}
+      placeholder={props.label} 
+      InputProps={{ spellCheck: 'false' }}
+      disabled={true}
+      color="primary"
+    />
+  )
+}
+
 
 function SettingsPanel(props) {
 
@@ -109,7 +124,10 @@ function SettingsPanel(props) {
           </QueryClientProvider>
         </Grid>
         <Grid item justifyContent="flex-start" alignItems="center"> 
-        <AccessPolicyField label="Access Policy Title" dataModel={props.dataModel}/>
+          <RegionField label="Region" dataModel={props.dataModel}/>
+        </Grid>
+        <Grid item justifyContent="flex-start" alignItems="center"> 
+          <AccessPolicyField label="Access Policy Title" dataModel={props.dataModel}/>
         </Grid>
       </Grid>
     </div>

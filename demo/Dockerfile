@@ -33,6 +33,7 @@ COPY create_keys.py /app/create_keys.py
 RUN python3 create_keys.py
 
 COPY app.py /app/app.py
+COPY tasks.py /app/tasks.py
 
 RUN mkdir -p /app/deploy/.terraform.d/plugin-cache
 COPY deploy/.terraformrc /root
