@@ -60,8 +60,44 @@ function BuildMapPageNumberToState () {
       }
     }
   }
+
+  const connectionEnabled = {}
+  connectionEnabled[[false, false, false, false, false]] = true
+  connectionEnabled[[false, false, false, false,  true]] = true
+  connectionEnabled[[false, false, false,  true, false]] = false
+  connectionEnabled[[false, false, false,  true,  true]] = true
+  connectionEnabled[[false, false,  true, false, false]] = true
+  connectionEnabled[[false, false,  true, false,  true]] = true
+  connectionEnabled[[false, false,  true,  true, false]] = false
+  connectionEnabled[[false, false,  true,  true,  true]] = true
+  connectionEnabled[[false,  true, false, false, false]] = true
+  connectionEnabled[[false,  true, false, false,  true]] = true
+  connectionEnabled[[false,  true, false,  true, false]] = false
+  connectionEnabled[[false,  true, false,  true,  true]] = true
+  connectionEnabled[[false,  true,  true, false, false]] = true
+  connectionEnabled[[false,  true,  true, false,  true]] = true
+  connectionEnabled[[false,  true,  true,  true, false]] = false
+  connectionEnabled[[false,  true,  true,  true,  true]] = true
+  connectionEnabled[[ true, false, false, false, false]] = true
+  connectionEnabled[[ true, false, false, false,  true]] = true
+  connectionEnabled[[ true, false, false,  true, false]] = false
+  connectionEnabled[[ true, false, false,  true,  true]] = true
+  connectionEnabled[[ true, false,  true, false, false]] = true
+  connectionEnabled[[ true, false,  true, false,  true]] = true
+  connectionEnabled[[ true, false,  true,  true, false]] = false
+  connectionEnabled[[ true, false,  true,  true,  true]] = true
+  connectionEnabled[[ true,  true, false, false, false]] = true
+  connectionEnabled[[ true,  true, false, false,  true]] = true
+  connectionEnabled[[ true,  true, false,  true, false]] = false
+  connectionEnabled[[ true,  true, false,  true,  true]] = true
+  connectionEnabled[[ true,  true,  true, false, false]] = true
+  connectionEnabled[[ true,  true,  true, false,  true]] = true
+  connectionEnabled[[ true,  true,  true,  true, false]] = false
+  connectionEnabled[[ true,  true,  true,  true,  true]] = true
+
+
   const stateCache = [null, null, null, null, null]
-  return {map: map, order: order, stateCache:stateCache}
+  return {map: map, order: order, stateCache:stateCache, connectionEnabled: connectionEnabled}
 }
 
 function getState() {
@@ -292,7 +328,12 @@ function getPage(allStates, pageMapper) {
       pageMapper.stateCache[ii] = curr_array[ii]
     }
   }
-  return pageMapper.map.get(pageMapper.stateCache)
+  return {
+    page: pageMapper.map.get(pageMapper.stateCache),
+    connectionEnabled: pageMapper.connectionEnabled[pageMapper.stateCache],
+  }
+  
+  
 }
 
 export {DataModel, getPage, webhook_name_default}

@@ -486,11 +486,11 @@ def webhook_access_allow_unauthenticated_status():
       if member == "allUsers" and binding['role'] == "roles/cloudfunctions.invoker":
         allUsers_is_invoker_member = True
   
-  app.logger.info(f'  {allUsers_is_invoker_member}')
+  app.logger.info(f'  allUsers_is_invoker_member: {allUsers_is_invoker_member}')
   if allUsers_is_invoker_member:
-    return Response(status=200, response=json.dumps({'status':True}))
-  else:
     return Response(status=200, response=json.dumps({'status':False}))
+  else:
+    return Response(status=200, response=json.dumps({'status':True}))
 
 
 @app.route('/update_webhook_access', methods=['POST'])
@@ -522,20 +522,20 @@ def update_webhook_access():
       if member == "allUsers" and binding['role'] == "roles/cloudfunctions.invoker":
         allUsers_is_invoker_member = True
   if (
-    (internal_only and allUsers_is_invoker_member) or 
-    ((not internal_only) and (not allUsers_is_invoker_member))
+    (not internal_only and allUsers_is_invoker_member) or 
+    ((internal_only) and (not allUsers_is_invoker_member))
   ):
     app.logger.info(f'  internal_only matches request; no change needed')
     app.logger.info(f'  internal_only ({internal_only}) matches request; no change needed')
     return Response(status=200)
 
-  if not internal_only:
+  if internal_only:
     for binding in policy_dict.get('bindings', []):
       for member in binding.get('members', []):
         if binding['role'] == "roles/cloudfunctions.invoker":
           binding['members'] = [member for member in binding['members'] if member != 'allUsers']
   else:
-    if 'bindings' not in policy_dict or len(policy_dict['bindings'] == 0):
+    if 'bindings' not in policy_dict or len(policy_dict['bindings']) == 0:
       policy_dict['bindings'] = [{'role': 'roles/cloudfunctions.invoker', 'members': []}]
     invoker_role_exists = None
     for binding in policy_dict['bindings']:
@@ -544,7 +544,6 @@ def update_webhook_access():
         binding['members'].append('allUsers')
     if not invoker_role_exists:
       policy_dict['bindings'].append({'role': 'roles/cloudfunctions.invoker', 'members': ['allUsers']})
-
   r = requests.post(f'https://cloudfunctions.googleapis.com/v1/projects/{project_id}/locations/{region}/functions/{webhook_name}:setIamPolicy', headers=headers, json={'policy':policy_dict})
   if r.status_code != 200:
     app.logger.info(f'  cloudfunctions API rejected setIamPolicy POST request: {r.text}')

@@ -8,7 +8,7 @@ function StateImage(props) {
   let renderedPageNumber = props.dataModel.renderedPageNumber
   let allStates = props.dataModel.allStates
   let pageMapper = props.dataModel.pageMapper
-  const currPage = getPage(allStates, pageMapper) ? getPage(allStates, pageMapper) : 33
+  const currPage = getPage(allStates, pageMapper).page ? getPage(allStates, pageMapper).page : 33
   const isLoading = renderedPageNumber.current !== currPage;
   const pageHeight = 300
   return(

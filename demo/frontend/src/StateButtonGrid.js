@@ -9,6 +9,7 @@ import Popover from '@mui/material/Popover';
 import Typography from '@mui/material/Typography';
 import Button from '@mui/material/Button';
 import Terminal from '@mui/icons-material/Terminal';
+import {getPage} from './DataModel.js';
 
 
 const Item = styled(Paper)(({ theme }) => ({
@@ -39,7 +40,7 @@ function getControlElem(title, state, timeout, blocked_by_timeout, queryEndpoint
       <Grid item>
         <Item sx={{my: 0}} variant="string">{toggleStatusElem}</Item>
       </Grid>
-      <Grid item sx={{ width: 320 }}>
+      <Grid item sx={{ width: 330 }}>
         <Typography variant="body1" align="right">
           {title}
         </Typography> 
@@ -63,6 +64,34 @@ function StateChangeButtonGrid(props){
   let liveMode = props.liveMode
   let dataModel = props.dataModel
 
+  var connectionEnabled;
+  var extraGridItem;
+  if (!liveMode) {
+    if (getPage(dataModel.allStates, dataModel.pageMapper).connectionEnabled===true) {
+      connectionEnabled = <Grid item><div style={{ color: '#73DC54' }}>Yes</div></Grid>;
+    } else if (getPage(dataModel.allStates, dataModel.pageMapper).connectionEnabled===false) {
+      connectionEnabled = <Grid item><div style={{ color: 'red' }}>{"No"}</div></Grid>;
+    } else {
+      connectionEnabled = "TODO"
+    }
+    extraGridItem = (<Grid item>
+      <Grid container direction='row' columnSpacing={3} alignItems="center">
+        <Grid item>
+          <Box sx={{my: 0, width: 58}} variant="string" />
+        </Grid>
+        <Grid item sx={{ width: 330 }}>
+          <Typography variant="body1" align="right">
+            Can Dialogflow contact Cloud Functions?
+          </Typography> 
+        </Grid>
+        {connectionEnabled}
+      </Grid>
+    </Grid>)
+  } else {
+    extraGridItem = <></>;
+  }
+
+
   return (
     <>
       <Grid container direction='column' rowSpacing={1}>
@@ -72,14 +101,6 @@ function StateChangeButtonGrid(props){
             "/webhook_access_allow_unauthenticated_status", 
             "/update_webhook_access", 
             cloudfunctionsRestrictedState, liveMode, dataModel, pageMapper, pageNumber)}
-        </Grid>
-        
-        <Grid item>
-        {getControlElem("Webhook Allow Internal Ingress Only?",
-          webhookIngressState, 85, 110,
-          "/webhook_ingress_internal_only_status", 
-          "/update_webhook_ingress", 
-          cloudfunctionsRestrictedState, liveMode, dataModel, pageMapper, pageNumber)}
         </Grid>
 
         <Grid item>
@@ -99,12 +120,22 @@ function StateChangeButtonGrid(props){
         </Grid>
 
         <Grid item>
+        {getControlElem("Webhook Allow Internal Ingress Only?",
+          webhookIngressState, 85, 110,
+          "/webhook_ingress_internal_only_status", 
+          "/update_webhook_ingress", 
+          cloudfunctionsRestrictedState, liveMode, dataModel, pageMapper, pageNumber)}
+        </Grid>
+
+        <Grid item>
         {getControlElem("Route Dialogflow Through VPC Proxy?",
           serviceDirectoryWebhookState, 8, 110,
           "/service_directory_webhook_fulfillment_status", 
           "/update_service_directory_webhook_fulfillment", 
           dialogflowRestrictedState, liveMode, dataModel, pageMapper, pageNumber)}
         </Grid>
+
+        {extraGridItem}
       </Grid>
     </>
 )}

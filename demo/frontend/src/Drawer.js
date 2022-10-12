@@ -29,7 +29,7 @@ import { getCookie, LOGIN_COOKIE_NAME } from './Utilities.js';
 
 
 const drawerWidth = 240;
-const TITLE = 'VPC-SC Live Demo'
+const TITLE = 'Securing Dialogflow CX with Webhook Fulfillment: VPC Service Controls'
 
 const openedMixin = (theme) => ({
   width: drawerWidth,

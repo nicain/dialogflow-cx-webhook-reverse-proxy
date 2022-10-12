@@ -41,7 +41,7 @@ function ToggleStatus(props) {
   
   useEffect(() => {
     if (updatePageNumber.current) {
-      const newPageNumber = getPage(props.dataModel.allStates, props.pageMapper)
+      const newPageNumber = getPage(props.dataModel.allStates, props.pageMapper).page
       props.pageNumber.set(newPageNumber)
       updatePageNumber.current = false
     }
