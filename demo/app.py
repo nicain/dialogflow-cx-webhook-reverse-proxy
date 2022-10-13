@@ -796,15 +796,19 @@ def get_principal():
 @app.route('/validate_project_id', methods=['get'])
 def validate_project_id():
   project_id = request.args.get('project_id', None)
+  print('project_id', project_id)
   if not project_id:
     return Response(status=200, response=json.dumps({'status':False}, indent=2))
   token_dict = get_token(request, token_type='access_token')
+  print('token_dict', token_dict)
   if 'response' in token_dict:
+    print("ERROR TO DEBUG", token_dict['response'])
     return token_dict['response']
   access_token = token_dict['access_token']
 
   headers = {}
   headers['Authorization'] = f'Bearer {access_token}'
+  print('headers', headers)
   r = requests.get(f'https://cloudresourcemanager.googleapis.com/v1/projects/{project_id}', headers=headers)
 
   if r.status_code == 200:

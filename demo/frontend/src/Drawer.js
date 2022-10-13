@@ -154,10 +154,15 @@ function MiniDrawer(props) {
   }
   const [activePage, setActivePage] = useQueryState('page')
 
+  props.dataModel.projectData.project_id = {current: null, set: null};
+  [props.dataModel.projectData.project_id.current, props.dataModel.projectData.project_id.set] = useQueryState('project_id')
 
   const queryParams = {};
   if (typeof activePage==='string') {
     queryParams['page'] = activePage
+  }
+  if (typeof props.dataModel.projectData.project_id.current==='string') {
+    queryParams['project_id'] = props.dataModel.projectData.project_id.current
   }
   props.dataModel.queryParams = queryParams
   const queryStr = new URLSearchParams(props.dataModel.queryParams).toString();

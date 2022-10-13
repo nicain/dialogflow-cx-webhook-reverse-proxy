@@ -98,6 +98,7 @@ resource "google_dialogflow_cx_agent" "full_agent" {
     command = "/app/deploy/terraform/webhook-agent/deploy_agent.sh --region=${var.region} --project_id=${var.project_id} --webhook_name=${var.webhook_name} --token=${var.access_token}"
   }
   depends_on = [
-    var.dialogflow_api
+    var.dialogflow_api,
+    google_cloudfunctions_function.webhook,
   ]
 }

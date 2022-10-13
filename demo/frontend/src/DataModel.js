@@ -116,18 +116,18 @@ function InitializeState(state) {
 }
 
 function ProjectData () {
-  const project_id = {current: null, set: null};
+  
   const principal = {current: null, set: null};
   const webhook_name = {current: null, set: null};
   const region = {current: null, set: null};
   const accessPolicyTitle = {current: null, set: null};
-  [project_id.current, project_id.set] = useState(project_id_default);
+  
   [webhook_name.current, webhook_name.set] = useState(webhook_name_default);
   [region.current, region.set] = useState(region_default);
   [principal.current, principal.set] = useState(null);
   [accessPolicyTitle.current, accessPolicyTitle.set] = useState(access_policy_title_default);
   return {
-    project_id: project_id,
+    project_id: {current: null, set: null},
     webhook_name: webhook_name,
     region: region,
     principal: principal,
