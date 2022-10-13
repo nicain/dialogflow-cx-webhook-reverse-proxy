@@ -77,7 +77,6 @@ function AccessPolicyField(props) {
   function onChange(e) {
     props.dataModel.projectData.accessPolicyTitle.set(e.target.value)
   }
-
   return (
     <TextField 
       sx={props.sx ? props.sx: {mx:2, width: 350}} 
@@ -85,10 +84,11 @@ function AccessPolicyField(props) {
       variant="outlined" 
       value={props.dataModel.projectData.accessPolicyTitle.current}
       onChange={onChange} 
-      placeholder={props.label} 
+      placeholder={''} 
       InputProps={{ spellCheck: 'false' }}
       disabled={props.dataModel.terraformLocked.current}
       color="primary"
+      InputLabelProps={{ shrink: props.dataModel.projectData.accessPolicyTitle.current }}
     />
   )
 }

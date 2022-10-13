@@ -69,14 +69,30 @@ function ToggleStatus(props) {
     refetch()
   }
 
+  var disabled;
+  if (typeof(props.state.isUpdating.current) != "boolean") {
+    disabled = false;
+  } else {
+    if (
+      props.state.isUpdating.current || 
+      props.state.blocked.current || 
+      props.dataModel.projectData.project_id.current==null || 
+      !props.dataModel.loggedIn.current
+    ) {
+      disabled = true;
+    } else {
+      disabled = false;
+    }
+  }
+
   return (
     <>
       {<Switch
         onChange={onChange} 
         checked={typeof(props.state.status.current) == "boolean" ? props.state.status.current : false}
-        disabled={typeof(props.state.isUpdating.current) == "boolean" ? (props.state.isUpdating.current || props.state.blocked.current) : false}
-        style={{visibility: (!props.dataModel.loggedIn.current || props.state.blocked.current || props.state.isUpdating.current) ? "hidden" : "visible"}}
-        color="secondary"
+        // disabled={disabled}
+        style={{visibility: disabled ? "hidden" : "visible"}}
+        // color="secondary"
       />}
     </>
   )

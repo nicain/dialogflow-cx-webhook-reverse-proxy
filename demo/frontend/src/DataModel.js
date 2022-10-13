@@ -270,7 +270,6 @@ function DataModel () {
   const loggedIn = {current: null, set: null};
   const pageNumber = {current: null, set: null};
   const renderedPageNumber = {current: null, set: null};
-  const activePage = {current: null, set: null};
   const terraformLocked = {current: null, set: null};
   const validProjectId = {current: null, set: null};
   const invertAssetCollectionSwitches = {current: null, set: null};
@@ -311,6 +310,7 @@ function DataModel () {
     invertAssetCollectionSwitches:invertAssetCollectionSwitches,
     showServicesPanel:showServicesPanel,
     sessionExpiredModalOpen:sessionExpiredModalOpen,
+    queryParams: {},
   }
   return dataModel
 }

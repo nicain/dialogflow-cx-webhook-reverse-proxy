@@ -154,8 +154,15 @@ function MiniDrawer(props) {
   }
   const [activePage, setActivePage] = useQueryState('page')
 
-  let loginButton = <DrawerButton open={open} text={"Login"} icon={Login} href={`http://${window.location.host}/session`} dataModel={props.dataModel} targetPage={null} activePage={activePage}/>
-  let logoutButton = <DrawerButton open={open} text={"Logout"} icon={Logout} href={`http://${window.location.host}/logout`} dataModel={props.dataModel} targetPage={null} activePage={activePage}/>
+
+  const queryParams = {};
+  if (typeof activePage==='string') {
+    queryParams['page'] = activePage
+  }
+  props.dataModel.queryParams = queryParams
+  const queryStr = new URLSearchParams(props.dataModel.queryParams).toString();
+  let loginButton = <DrawerButton open={open} text={"Login"} icon={Login} href={`http://${window.location.host}/session?${queryStr}`} dataModel={props.dataModel} targetPage={null} activePage={activePage}/>
+  let logoutButton = <DrawerButton open={open} text={"Logout"} icon={Logout} href={`http://${window.location.host}/logout?${queryStr}`} dataModel={props.dataModel} targetPage={null} activePage={activePage}/>
   let HomeButton = <DrawerButton open={open} text={"Home"} icon={Home} dataModel={props.dataModel} targetPage='home' onClick={() => {setActivePage('home')}} activePage={activePage}/>
   let TutorialButton = <DrawerButton open={open} text={"Tutorial"} icon={School} dataModel={props.dataModel} targetPage='tutorial' onClick={() => {
     setActivePage('tutorial'); 

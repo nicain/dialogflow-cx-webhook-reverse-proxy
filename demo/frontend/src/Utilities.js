@@ -3,6 +3,10 @@ const LOGIN_COOKIE_NAME = 'user_logged_in'
 
 function backendEnabled(dataModel) {
 
+  if (dataModel.projectData.project_id.current==='') {
+    return false
+  }
+
   if (typeof(dataModel.validProjectId.current) != "boolean") {
     return false
   }

@@ -23,7 +23,7 @@ function GetPrincipal(props) {
   })
 
   const principal = data ? data.principal : ""
-
+  const queryStr = new URLSearchParams(props.dataModel.queryParams).toString();
   var tooltipTitle
   var button
   var href
@@ -31,12 +31,12 @@ function GetPrincipal(props) {
   if (principal==="" || principal===null || principal === undefined) {
     tooltipTitle = 'Login'
     button = <Login/>
-    href = `http://${window.location.host}/session`
+    href = `http://${window.location.host}/session?${queryStr}`
     loginEnabled = true
   } else {
     tooltipTitle = 'Logout'
     button = <Logout/>
-    href = `http://${window.location.host}/logout`
+    href = `http://${window.location.host}/logout?${queryStr}`
     loginEnabled = false
   }
   return (

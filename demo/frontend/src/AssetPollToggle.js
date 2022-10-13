@@ -20,6 +20,7 @@ import { backendEnabled, getBucket, handleTokenExpired } from './Utilities.js';
 
 
 const PANEL_WIDTH = 150;
+const ACCESS_POLICY_RESOURCE='module.service_perimeter.google_access_context_manager_access_policy.access_policy[0]';
 
 function ResourceCollectionDeployment(target, dataModel) {
   var valueList
@@ -427,12 +428,6 @@ function ToggleAsset(props) {
 
   var visibility
   if (!props.dataModel.validProjectId.current || update.isFetching || tfImport.isFetching || typeof(asset.current) != "boolean" || props.dataModel.terraformLocked.current || asset.current==='BLOCKED') {
-    // console.log("!props.dataModel.validProjectId.current", !props.dataModel.validProjectId.current) 
-    // console.log("update.isFetching", update.isFetching)
-    // console.log("tfImport.isFetching", tfImport.isFetching)
-    // console.log("typeof(asset.current)", typeof(asset.current) != "boolean")
-    // console.log("props.dataModel.terraformLocked.current", props.dataModel.terraformLocked.current)
-    // console.log("asset.current", asset.current==='BLOCKED')
     visibility = "hidden"
   } else {
     visibility = "visible"
@@ -546,6 +541,7 @@ function PollAssetStatus(props) {
         for (var key in props.dataModel.assetStatus) {
           props.dataModel.assetStatus[key].set(data.resources.includes(key))
         }
+        props.dataModel.projectData.accessPolicyTitle.set(data.accessPolicyTitle)
       }
     }
   })

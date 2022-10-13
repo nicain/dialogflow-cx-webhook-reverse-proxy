@@ -11,6 +11,7 @@ import io
 import tempfile
 import tasks
 from invoke import context
+import functools
 
 
 from urllib.parse import urlparse 
@@ -40,7 +41,7 @@ def user_service_domain(request):
   app.logger.info(f'user_service_domain(request): "{domain}"')
   return domain
 
-def login_landing_uri(request):
+def login_landing_uri(request, query_params={}):
   if request.host_url == 'http://localhost:5001/':
     assert not PROD
     landing_uri = 'http://user-service.localhost:3000'
@@ -50,6 +51,12 @@ def login_landing_uri(request):
   else:
     assert PROD
     landing_uri = request.host_url
+
+  if query_params:
+    param_string = '&'.join([f'{key}={val}'for key, val in query_params.items()])
+    landing_uri = f'{landing_uri}/?{param_string}'
+
+
   app.logger.info(f'login_landing_uri(request): landing_uri="{landing_uri}"')
   return landing_uri
 
@@ -59,6 +66,7 @@ AUTH_SERVICE_VERIFY_AUD_ENDPOINT = f'http://{AUTH_SERVICE_HOSTNAME}/verify_aud'
 AUTH_SERVICE_LOGIN_ENDPOINT = f'http://{AUTH_SERVICE_HOSTNAME}/login'
 
 DOMAIN = 'webhook.internal'
+ACCESS_POLICY_RESOURCE = 'module.service_perimeter.google_access_context_manager_access_policy.access_policy[0]'
 
 
 import base64
@@ -117,21 +125,13 @@ def get_token(request, token_type='access'):
     app.logger.info(f'get_token request did not have a session_id')
     return {'response': Response(status=200, response=json.dumps({'status':'BLOCKED', 'reason':'BAD_SESSION_ID'}))}
 
-  params = {
-    'session_id': request.cookies.get("session_id"),
-    'origin': request.host_url,
-  }
-  r = requests.get(AUTH_SERVICE_AUTH_ENDPOINT, params=params)
-  if r.status_code == 401:
-    app.logger.info(f'  auth-service "{AUTH_SERVICE_AUTH_ENDPOINT}" rejected request: {r.text}')
-    return {'response': Response(status=500, response=json.dumps({'status':'BLOCKED', 'reason':'REJECTED_REQUEST'}))}
+  session_id = request.cookies.get("session_id")
+  origin = request.host_url
 
-  zf = zipfile.ZipFile(io.BytesIO(r.content))
-  key_bytes_stream = zf.open('key').read()
-  decrypt = PKCS1_OAEP.new(key=pr_key)
-  decrypted_message = decrypt.decrypt(key_bytes_stream)
-  aes_cipher = AESCipher(key=decrypted_message)
-  auth_data = json.loads(aes_cipher.decrypt(zf.open('session_data').read()).decode())
+  response = get_token_from_auth_server(session_id, origin, token_type)
+  if 'response' in response:
+    return response
+  auth_data = response['auth_data']
 
   try:
     info = id_token.verify_oauth2_token(auth_data['id_token'], reqs.Request())
@@ -168,11 +168,36 @@ def get_token(request, token_type='access'):
   return response
 
 
+@functools.cache
+def get_token_from_auth_server(session_id, origin, token_type):
+
+  params = {
+    'session_id': session_id,
+    'origin': origin,
+  }
+
+  r = requests.get(AUTH_SERVICE_AUTH_ENDPOINT, params=params)
+  if r.status_code == 401:
+    app.logger.info(f'  auth-service "{AUTH_SERVICE_AUTH_ENDPOINT}" rejected request: {r.text}')
+    return {'response': Response(status=500, response=json.dumps({'status':'BLOCKED', 'reason':'REJECTED_REQUEST'}))}
+
+  zf = zipfile.ZipFile(io.BytesIO(r.content))
+  key_bytes_stream = zf.open('key').read()
+  decrypt = PKCS1_OAEP.new(key=pr_key)
+  decrypted_message = decrypt.decrypt(key_bytes_stream)
+  aes_cipher = AESCipher(key=decrypted_message)
+  auth_data = json.loads(aes_cipher.decrypt(zf.open('session_data').read()).decode())
+
+  return {'auth_data': auth_data}
+
+
+
+
 @app.route('/session', methods=['GET'])
 def login():
   app.logger.info(f'/session:')
   session_id = uuid.uuid4().hex
-  state = b64encode(json.dumps({'return_to': login_landing_uri(request), 'session_id':session_id, 'public_pem':public_pem}).encode()).decode()
+  state = b64encode(json.dumps({'return_to': login_landing_uri(request, query_params=request.args), 'session_id':session_id, 'public_pem':public_pem}).encode()).decode()
   response = redirect(f'{AUTH_SERVICE_LOGIN_ENDPOINT}?state={state}')
   app.logger.info(f'  END /session')
   response.set_cookie("session_id", value=session_id, secure=True, httponly=True, domain=user_service_domain(request))
@@ -183,7 +208,7 @@ def login():
 @app.route('/logout', methods=['GET'])
 def logout():
   app.logger.info(f'/logout:')
-  response = redirect(login_landing_uri(request))
+  response = redirect(login_landing_uri(request, query_params=request.args))
   response.delete_cookie('session_id', domain=user_service_domain(request))
   response.delete_cookie('user_logged_in', domain=user_service_domain(request))
   app.logger.info(f'  END /logout')
@@ -266,6 +291,9 @@ def get_project_number(token, project_id):
 
 def get_access_policy_name(token, access_policy_title, project_id):
 
+  if not access_policy_title:
+    return {"response": Response(status=200, response=json.dumps({'status':'BLOCKED', 'reason':'NO_ACCESS_POLICY'}))}
+
   headers = {}
   headers['Content-type'] = 'application/json'
   headers['Authorization'] = f'Bearer {token}'
@@ -309,7 +337,7 @@ def restricted_services_status_cloudfunctions():
   token = token_dict['access_token']
 
   project_id = request.args['project_id']
-  access_policy_title = request.args['access_policy_title']
+  access_policy_title = request.args.get('access_policy_title', None)
 
   response = get_access_policy_name(token, access_policy_title, project_id)
   if 'response' in response:
@@ -332,7 +360,7 @@ def restricted_services_status_dialogflow():
   token = token_dict['access_token']
 
   project_id = request.args['project_id']
-  access_policy_title = request.args['access_policy_title']
+  access_policy_title = request.args.get('access_policy_title', None)
 
   response = get_access_policy_name(token, access_policy_title, project_id)
   if 'response' in response:
@@ -767,7 +795,9 @@ def get_principal():
 
 @app.route('/validate_project_id', methods=['get'])
 def validate_project_id():
-  project_id = request.args['project_id']
+  project_id = request.args.get('project_id', None)
+  if not project_id:
+    return Response(status=200, response=json.dumps({'status':False}, indent=2))
   token_dict = get_token(request, token_type='access_token')
   if 'response' in token_dict:
     return token_dict['response']
@@ -804,15 +834,26 @@ def get_terraform_env(access_token, request_args, debug=False):
   return env
 
 
+def get_access_policy_title(token, access_policy_id):
+  headers = {}
+  headers['Authorization'] = f'Bearer {token}'
+  r = requests.get(f'https://accesscontextmanager.googleapis.com/v1/accessPolicies/{access_policy_id}', headers=headers)
+  if r.status_code != 200:
+    return {'response': Response(status=500, response=r.text)}
+  return {'access_policy_title': r.json()['title']}
+
+
+
 @app.route('/asset_status', methods=['GET'])
 def asset_status():
   debug = request.args.get('debug') == 'true'
+  target = request.args.get('target', None)
+  update = request.args.get('update', True)
   token_dict = get_token(request, token_type='access_token')
   if 'response' in token_dict:
     return token_dict['response']
   access_token = token_dict['access_token']
   env = get_terraform_env(access_token, request.args, debug=debug)
-
 
   c = context.Context()
   module = '/app/deploy/terraform/main.tf'
@@ -822,14 +863,33 @@ def asset_status():
     result = tasks.tf_init(c, module, workdir, env, prefix, debug)
     if result: return result
 
-    result = tasks.tf_plan(c, module, workdir, env, debug)
-    if result: return result
+    resource_id_dict = {}
+    if update:
+      result = tasks.tf_plan(c, module, workdir, env, debug, target=target)
+      if 'response' in result: return result['response']
+      for hook in result['hooks']['refresh_complete']:
+        resource_id_dict[hook['resource']['addr']] = hook['id_value']
+
+    if ACCESS_POLICY_RESOURCE in resource_id_dict:
+      access_policy_id = resource_id_dict[ACCESS_POLICY_RESOURCE]
+      response = get_access_policy_title(access_token, access_policy_id)
+      if 'response' in response: return response['response']
+      access_policy_title = response['access_policy_title']
+    else:
+      access_policy_title = None
 
     result = tasks.tf_state_list(c, module, workdir, env, debug)
     if 'response' in result: return result["response"]
     resources = result['resources']
         
-    return Response(status=200, response=json.dumps({'status':'OK', 'resources':resources}, indent=2))
+    return Response(status=200, response=json.dumps(
+      {
+        'status':'OK', 
+        'resources':resources, 
+        'resource_id_dict':resource_id_dict,
+        'accessPolicyTitle': access_policy_title,
+      }, indent=2)
+    )
 
 
 @app.route('/update_target', methods=['POST'])
@@ -856,13 +916,13 @@ def update_target():
     result = tasks.tf_init(c, module, workdir, env, prefix, debug)
     if result: return result
 
-    result = tasks.tf_plan(c, module, workdir, env, debug)
-    if result: return result
-
     if targets:
       for target in targets:
+        result = tasks.tf_plan(c, module, workdir, env, debug, target=target)
+        if 'response' in result: return result['response']
         result = tasks.tf_apply(c, module, workdir, env, debug, destroy, target=target)
     else:
+        result = tasks.tf_plan(c, module, workdir, env, debug)
         result = tasks.tf_apply(c, module, workdir, env, debug, destroy)
     if result: return result
 

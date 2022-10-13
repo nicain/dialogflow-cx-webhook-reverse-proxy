@@ -27,11 +27,12 @@ def tf_init(c, module, workdir, env, prefix, debug):
 
 
 @task
-def tf_plan(c, module, workdir, env, debug):
+def tf_plan(c, module, workdir, env, debug, target=None):
+  target_option = f'-target={target}' if target else ''
   json_option = '-json' if not debug else ''
   promise = c.run(f'\
     cp {module} {workdir} &&\
-    terraform -chdir="{workdir}" plan {json_option} -refresh-only -var access_token=\'{env["GOOGLE_OAUTH_ACCESS_TOKEN"]}\'\
+    terraform -chdir="{workdir}" plan {json_option} -refresh-only -var access_token=\'{env["GOOGLE_OAUTH_ACCESS_TOKEN"]}\' {target_option}\
   ', warn=True, hide=True, asynchronous=True, env=env)
   result = promise.join()
 
@@ -41,20 +42,32 @@ def tf_plan(c, module, workdir, env, debug):
     print(result.stderr)
   else:
     errors = []
+    hooks = {
+      'refresh_start':[], 
+      'refresh_complete':[], 
+      'apply_complete':[],
+      'apply_start': [],
+    }
     lines = result.stdout.split('\n')
     for line in lines:
       if line.strip():
         try:
-          message = json.loads(line)
+          message = json.loads(line.strip())
           if message["@level"] == "error":
             errors.append(message)
-        except:
-          print("COULD NOT LOAD", line)
+          if 'hook' in message:
+            hooks[message['type']].append(message['hook'])
+        except Exception as e:
+          print("COULD NOT LOAD", repr(line), type(e), e)
     if errors:
-      return Response(status=500, response=json.dumps({
-        'status': 'ERROR',
-        'errors': errors,
-      }))
+      return {
+        'response': 
+        Response(status=500, response=json.dumps({
+          'status': 'ERROR',
+          'errors': errors,
+        }))
+      }
+    return {'hooks': hooks}
 
 
 @task
