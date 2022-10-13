@@ -26,6 +26,7 @@ import Tooltip from '@mui/material/Tooltip';
 import { PageContent } from './PageContent.js';
 import { SessionExpiredModal } from './SessionExpiredModal.js';
 import { getCookie, LOGIN_COOKIE_NAME } from './Utilities.js';
+import {useQueryState} from "./UseQueryState.js"
 
 
 const drawerWidth = 240;
@@ -101,7 +102,7 @@ function DrawerButton(props) {
   const Icon = props.icon
   return (
     <Tooltip title={props.open ? "" : props.text} disableInteractive arrow placement="top">
-      <ListItem key={props.text} disablePadding sx={{ display: 'block' }} selected={props.dataModel.activePage.current === props.pageNumber}>
+      <ListItem key={props.text} disablePadding sx={{ display: 'block' }} selected={props.activePage === props.targetPage}>
         <ListItemButton
           sx={{
             minHeight: 48,
@@ -151,18 +152,19 @@ function MiniDrawer(props) {
       state.blocked.set(false)
     }
   }
+  const [activePage, setActivePage] = useQueryState('page')
 
-  let loginButton = <DrawerButton open={open} text={"Login"} icon={Login} href={`http://${window.location.host}/session`} dataModel={props.dataModel} pageNumber={null}/>
-  let logoutButton = <DrawerButton open={open} text={"Logout"} icon={Logout} href={`http://${window.location.host}/logout`} dataModel={props.dataModel} pageNumber={null}/>
-  let HomeButton = <DrawerButton open={open} text={"Home"} icon={Home} dataModel={props.dataModel} pageNumber={0} onClick={() => {props.dataModel.activePage.set(0)}}/>
-  let TutorialButton = <DrawerButton open={open} text={"Tutorial"} icon={School} dataModel={props.dataModel} pageNumber={1} onClick={() => {
-    props.dataModel.activePage.set(1); 
+  let loginButton = <DrawerButton open={open} text={"Login"} icon={Login} href={`http://${window.location.host}/session`} dataModel={props.dataModel} targetPage={null} activePage={activePage}/>
+  let logoutButton = <DrawerButton open={open} text={"Logout"} icon={Logout} href={`http://${window.location.host}/logout`} dataModel={props.dataModel} targetPage={null} activePage={activePage}/>
+  let HomeButton = <DrawerButton open={open} text={"Home"} icon={Home} dataModel={props.dataModel} targetPage='home' onClick={() => {setActivePage('home')}} activePage={activePage}/>
+  let TutorialButton = <DrawerButton open={open} text={"Tutorial"} icon={School} dataModel={props.dataModel} targetPage='tutorial' onClick={() => {
+    setActivePage('tutorial'); 
     resetStateOnPageChange(props.dataModel)
-  }}/>
-  let LiveDemoButton = <DrawerButton open={open} text={"Live Demo"} icon={Stream} dataModel={props.dataModel} pageNumber={2} onClick={() => {
-    props.dataModel.activePage.set(2);
+  }} activePage={activePage}/>
+  let LiveDemoButton = <DrawerButton open={open} text={"Live Demo"} icon={Stream} dataModel={props.dataModel} targetPage='liveDemo' onClick={() => {
+    setActivePage('liveDemo');
     resetStateOnPageChange(props.dataModel)
-  }}/>
+  }} activePage={activePage}/>
 
   return (
     <div>
@@ -204,13 +206,13 @@ function MiniDrawer(props) {
           <List>
             {TutorialButton}
             {LiveDemoButton}
-            {/* {DeployInstructionsButton} */}
           </List>
         </Drawer>
         <Box component="main" sx={{ flexGrow: 1, p: 3 }}>
           <DrawerHeader />
           <PageContent
             dataModel={props.dataModel}
+            activePage={activePage}
           />
         </Box>
       </Box>

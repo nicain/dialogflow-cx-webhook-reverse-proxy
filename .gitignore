@@ -13,3 +13,5 @@ plan.out
 terraform.tfstate
 terraform.tfstate.backup
 **/plugin-cache
+
+demo/frontend/package-lock.json.bak

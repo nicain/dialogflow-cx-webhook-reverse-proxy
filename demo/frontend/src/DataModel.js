@@ -292,7 +292,6 @@ function DataModel () {
   [loggedIn.current, loggedIn.set] = useState(false);
   [pageNumber.current, pageNumber.set] = useState(33);
   [renderedPageNumber.current, renderedPageNumber.set] = useState(null);
-  [activePage.current, activePage.set] = useState(0);
   [terraformLocked.current, terraformLocked.set] = useState(false);
   [validProjectId.current, validProjectId.set] = useState(false);
   [invertAssetCollectionSwitches.current, invertAssetCollectionSwitches.set] = useState(false);
@@ -303,7 +302,6 @@ function DataModel () {
     pageMapper: pageMapper,
     loggedIn: loggedIn,
     pageNumber: pageNumber,
-    activePage: activePage,
     allStates: allStates,
     renderedPageNumber: renderedPageNumber,
     projectData: ProjectData(),

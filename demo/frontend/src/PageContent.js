@@ -78,13 +78,15 @@ function LiveDemoPage(props) {
 }
 
 function PageContent(props) {
-  const pageNumber = props.dataModel.activePage.current
-  if (pageNumber === 0) {
+  const targetPage = props.activePage
+  if (targetPage === 'home') {
     return <HomePage dataModel={props.dataModel}/>
-  } else if (pageNumber === 1) {
+  } else if (targetPage === 'tutorial') {
     return <TutorialPage dataModel={props.dataModel}/>
-  } else if (pageNumber === 2) {
+  } else if (targetPage === 'liveDemo') {
     return <LiveDemoPage dataModel={props.dataModel}/>
+  } else if (typeof(targetPage)==="undefined") {
+    return <HomePage dataModel={props.dataModel}/>
   }
 }
 
