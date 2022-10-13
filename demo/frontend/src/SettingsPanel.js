@@ -82,7 +82,7 @@ function AccessPolicyField(props) {
       sx={props.sx ? props.sx: {mx:2, width: 350}} 
       label={props.label} 
       variant="outlined" 
-      value={props.dataModel.projectData.accessPolicyTitle.current}
+      value={props.dataModel.projectData.accessPolicyTitle.current===null ? '' : props.dataModel.projectData.accessPolicyTitle.current}
       onChange={onChange} 
       placeholder={''} 
       InputProps={{ spellCheck: 'false' }}
