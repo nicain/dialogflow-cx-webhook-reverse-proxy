@@ -186,14 +186,14 @@ function PollStatus(props) {
       return <CircularProgress size={20} variant={"determinate"} value={100.0*(remainingTime/startTime)}/>;
     }
     return <CircularProgress size={20}/>;
-  } else if (props.state.blocked.current) {
+  } else if (props.state.blocked.current && data.status === 'BLOCKED') {
     return (
       <Typography variant="body2" align="right" style={{ color: 'red' }}>
         {`Blocked: ${data.reason}`}
       </Typography> 
     )
-    } else if (!props.dataModel.loggedIn.current) {
-      <div style={{ color: 'red' }}>{`Blocked: LOGIN_REQUIRED`}</div>;
+  } else if (!props.dataModel.loggedIn.current) {
+    return <div style={{ color: 'red' }}>{`Blocked: LOGIN_REQUIRED`}</div>;
   } else {
     // console.log(props.state.blocked.current)
     return (<div>{(props.state.status.current) ? "True" : "False"}</div>);

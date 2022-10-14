@@ -156,6 +156,8 @@ function MiniDrawer(props) {
 
   props.dataModel.projectData.project_id = {current: null, set: null};
   [props.dataModel.projectData.project_id.current, props.dataModel.projectData.project_id.set] = useQueryState('project_id')
+  props.dataModel.projectData.accessPolicyTitle = {current: null, set: null};
+  [props.dataModel.projectData.accessPolicyTitle.current, props.dataModel.projectData.accessPolicyTitle.set] = useQueryState('access_policy_title')
 
   const queryParams = {};
   if (typeof activePage==='string') {
@@ -163,6 +165,9 @@ function MiniDrawer(props) {
   }
   if (typeof props.dataModel.projectData.project_id.current==='string') {
     queryParams['project_id'] = props.dataModel.projectData.project_id.current
+  }
+  if (typeof props.dataModel.projectData.accessPolicyTitle.current==='string') {
+    queryParams['access_policy_title'] = props.dataModel.projectData.accessPolicyTitle.current
   }
   props.dataModel.queryParams = queryParams
   const queryStr = new URLSearchParams(props.dataModel.queryParams).toString();

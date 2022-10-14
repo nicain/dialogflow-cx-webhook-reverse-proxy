@@ -10,7 +10,6 @@ const webhook_name_default = "custom-telco-webhook";
 // const project_id_default = "vpc-sc-demo-nicholascain17";
 // const access_policy_title_default = null;
 
-const project_id_default = null;
 const access_policy_title_default = null;
 
 class ReversibleMap {
@@ -120,18 +119,16 @@ function ProjectData () {
   const principal = {current: null, set: null};
   const webhook_name = {current: null, set: null};
   const region = {current: null, set: null};
-  const accessPolicyTitle = {current: null, set: null};
   
   [webhook_name.current, webhook_name.set] = useState(webhook_name_default);
   [region.current, region.set] = useState(region_default);
   [principal.current, principal.set] = useState(null);
-  [accessPolicyTitle.current, accessPolicyTitle.set] = useState(access_policy_title_default);
   return {
     project_id: {current: null, set: null},
     webhook_name: webhook_name,
     region: region,
     principal: principal,
-    accessPolicyTitle: accessPolicyTitle,
+    accessPolicyTitle: {current: null, set: null},
   }
 }
 

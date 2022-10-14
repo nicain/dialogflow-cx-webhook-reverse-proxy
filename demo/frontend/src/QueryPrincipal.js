@@ -22,45 +22,46 @@ function GetPrincipal(props) {
     }
   })
 
-  const principal = data ? data.principal : ""
-  const queryStr = new URLSearchParams(props.dataModel.queryParams).toString();
-  var tooltipTitle
-  var button
-  var href
-  var loginEnabled
-  if (principal==="" || principal===null || principal === undefined) {
-    tooltipTitle = 'Login'
-    button = <Login/>
-    href = `http://${window.location.host}/session?${queryStr}`
-    loginEnabled = true
-  } else {
-    tooltipTitle = 'Logout'
-    button = <Logout/>
-    href = `http://${window.location.host}/logout?${queryStr}`
-    loginEnabled = false
-  }
+  // const principal = data ? data.principal : ""
+  // const queryStr = new URLSearchParams(props.dataModel.queryParams).toString();
+  // var tooltipTitle
+  // var button
+  // var href
+  // var loginEnabled
+  // if (principal==="" || principal===null || principal === undefined) {
+  //   tooltipTitle = 'Login'
+  //   button = <Login/>
+  //   href = `http://${window.location.host}/session?${queryStr}`
+  //   loginEnabled = true
+  // } else {
+  //   tooltipTitle = 'Logout'
+  //   button = <Logout/>
+  //   href = `http://${window.location.host}/logout?${queryStr}`
+  //   loginEnabled = false
+  // }
+  console.log(props.dataModel.projectData.principal.current);
   return (
   <div>
     <TextField 
       sx={{mx:2, width: 350, color: 'red'}}
-      label={(typeof(props.dataModel.projectData.principal.current)=== 'undefined' || props.dataModel.projectData.principal.current != null) ? "" : "Principal"} 
+      label={"Principal"} 
       variant="outlined" 
-      value={props.dataModel.projectData.principal.current} 
+      value={props.dataModel.projectData.principal.current===null ? '' : props.dataModel.projectData.principal.current} 
       placeholder={"Principal"} 
       disabled={true}
-
-      InputProps={{
-        style: { "backgroundColor": loginEnabled ? "#ffcdd2" : "transparent" },
-        endAdornment: (
-          <Tooltip title={tooltipTitle} disableInteractive arrow placement="top">
-            <InputAdornment position="end">
-              <IconButton edge='end' variant="outlined" href={href}>
-                 {button}
-              </IconButton>
-            </InputAdornment>
-          </Tooltip>
-        ),
-      }}
+      InputLabelProps={{ shrink: props.dataModel.projectData.principal.current }}
+      // InputProps={{
+      //   style: { "backgroundColor": loginEnabled ? "#ffcdd2" : "transparent" },
+      //   endAdornment: (
+      //     <Tooltip title={tooltipTitle} disableInteractive arrow placement="top">
+      //       <InputAdornment position="end">
+      //         <IconButton edge='end' variant="outlined" href={href}>
+      //            {button}
+      //         </IconButton>
+      //       </InputAdornment>
+      //     </Tooltip>
+      //   ),
+      // }}
     />
   </div>
   )

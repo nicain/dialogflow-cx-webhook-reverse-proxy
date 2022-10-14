@@ -128,7 +128,7 @@ def get_token(request, token_type='access'):
   session_id = request.cookies.get("session_id")
   origin = request.host_url
 
-  response = get_token_from_auth_server(session_id, origin, token_type)
+  response = get_token_from_auth_server(session_id, origin)
   if 'response' in response:
     return response
   auth_data = response['auth_data']
@@ -169,7 +169,7 @@ def get_token(request, token_type='access'):
 
 
 @functools.cache
-def get_token_from_auth_server(session_id, origin, token_type):
+def get_token_from_auth_server(session_id, origin):
 
   params = {
     'session_id': session_id,

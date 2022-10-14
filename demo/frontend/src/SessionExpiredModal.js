@@ -17,8 +17,11 @@ const style = {
 
 function SessionExpiredModal(props) {
 
-  const handleClose = () => props.dataModel.sessionExpiredModalOpen.set(false);
 
+  function handleClose() {
+    props.dataModel.sessionExpiredModalOpen.set(false);
+  }
+  const queryStr = new URLSearchParams(props.dataModel.queryParams).toString();
   return (
     <Modal
       open={props.dataModel.sessionExpiredModalOpen.current}
@@ -31,7 +34,7 @@ function SessionExpiredModal(props) {
         <Typography sx={{ mt: 2 }}>
           Please re-login to continue.
         </Typography>
-        <Button onClick={handleClose}>OK</Button>
+        <Button onClick={handleClose} href={`http://${window.location.host}/session?${queryStr}`}>OK</Button>
       </Box>
     </Modal>
   )
