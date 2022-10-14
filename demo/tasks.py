@@ -1,17 +1,30 @@
 from invoke import task, context
 import json
 from flask import Response
+import google.auth.transport.requests
+from google.oauth2 import service_account
+
 
 TF_PLAN_STORAGE_BUCKET = 'vpc-sc-demo-nicholascain15-tf'
 
 
 @task
 def tf_init(c, module, workdir, env, prefix, debug):
+  user_access_token = env.pop("GOOGLE_OAUTH_ACCESS_TOKEN")
+
+  credentials = service_account.Credentials.from_service_account_file(
+    '/app/demo-server-key.json', 
+    scopes=['https://www.googleapis.com/auth/cloud-platform']
+  )
+  request = google.auth.transport.requests.Request()
+  credentials.refresh(request)
+  env["GOOGLE_OAUTH_ACCESS_TOKEN"] = credentials.token
   promise = c.run(f'\
     cp {module} {workdir} &&\
     terraform -chdir={workdir} init -upgrade -reconfigure -backend-config="access_token={env["GOOGLE_OAUTH_ACCESS_TOKEN"]}" -backend-config="bucket={TF_PLAN_STORAGE_BUCKET}" -backend-config="prefix={prefix}"\
   ', warn=True, hide=True, asynchronous=True)
   result = promise.join()
+  env["GOOGLE_OAUTH_ACCESS_TOKEN"] = user_access_token
 
   if debug:
     print(result.exited)
