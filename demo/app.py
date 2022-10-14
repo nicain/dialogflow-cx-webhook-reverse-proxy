@@ -52,6 +52,9 @@ def login_landing_uri(request, query_params={}):
     assert PROD
     landing_uri = request.host_url
 
+  if landing_uri[-1] == '/':
+    landing_uri = landing_uri[:-1]
+
   if query_params:
     param_string = '&'.join([f'{key}={val}'for key, val in query_params.items()])
     landing_uri = f'{landing_uri}/?{param_string}'
@@ -352,7 +355,9 @@ def restricted_services_status_cloudfunctions():
     return token_dict['response']
   token = token_dict['access_token']
 
-  project_id = request.args['project_id']
+  project_id = request.args.get('project_id', None)
+  if not project_id:
+    return Response(status=200, response=json.dumps({'status':'BLOCKED', 'reason':'NO_PROJECT_ID'})) 
   access_policy_title = request.args.get('access_policy_title', None)
 
   response = get_access_policy_name(token, access_policy_title, project_id)
@@ -375,7 +380,9 @@ def restricted_services_status_dialogflow():
     return token_dict['response']
   token = token_dict['access_token']
 
-  project_id = request.args['project_id']
+  project_id = request.args.get('project_id', None)
+  if not project_id:
+    return Response(status=200, response=json.dumps({'status':'BLOCKED', 'reason':'NO_PROJECT_ID'})) 
   access_policy_title = request.args.get('access_policy_title', None)
 
   response = get_access_policy_name(token, access_policy_title, project_id)
@@ -468,7 +475,9 @@ def webhook_ingress_internal_only_status():
     return token_dict['response']
   token = token_dict['access_token']
 
-  project_id = request.args['project_id']
+  project_id = request.args.get('project_id', None)
+  if not project_id:
+    return Response(status=200, response=json.dumps({'status':'BLOCKED', 'reason':'NO_PROJECT_ID'})) 
   region = request.args['region']
   webhook_name = request.args['webhook_name']
 
@@ -498,7 +507,9 @@ def webhook_access_allow_unauthenticated_status():
     return token_dict['response']
   token = token_dict['access_token']
 
-  project_id = request.args['project_id']
+  project_id = request.args.get('project_id', None)
+  if not project_id:
+    return Response(status=200, response=json.dumps({'status':'BLOCKED', 'reason':'NO_PROJECT_ID'})) 
   region = request.args['region']
   webhook_name = request.args['webhook_name']
 
@@ -548,7 +559,9 @@ def update_webhook_access():
   content = request.get_json(silent=True)
   internal_only = content['status']
 
-  project_id = request.args['project_id']
+  project_id = request.args.get('project_id', None)
+  if not project_id:
+    return Response(status=200, response=json.dumps({'status':'BLOCKED', 'reason':'NO_PROJECT_ID'})) 
   region = request.args['region']
   webhook_name = request.args['webhook_name']
 
@@ -602,7 +615,9 @@ def update_webhook_ingress():
     return token_dict['response']
   token = token_dict['access_token']
 
-  project_id = request.args['project_id']
+  project_id = request.args.get('project_id', None)
+  if not project_id:
+    return Response(status=200, response=json.dumps({'status':'BLOCKED', 'reason':'NO_PROJECT_ID'})) 
   region = request.args['region']
   webhook_name = request.args['webhook_name']
 
@@ -678,7 +693,9 @@ def update_security_perimeter_cloudfunctions():
     return token_dict['response']
   token = token_dict['access_token']
 
-  project_id = request.args['project_id']
+  project_id = request.args.get('project_id', None)
+  if not project_id:
+    return Response(status=200, response=json.dumps({'status':'BLOCKED', 'reason':'NO_PROJECT_ID'})) 
   access_policy_title = request.args['access_policy_title']
   response = get_access_policy_name(token, access_policy_title, project_id)
   if 'response' in response:
@@ -698,7 +715,9 @@ def update_security_perimeter_dialogflow():
     return token_dict['response']
   token = token_dict['access_token']
 
-  project_id = request.args['project_id']
+  project_id = request.args.get('project_id', None)
+  if not project_id:
+    return Response(status=200, response=json.dumps({'status':'BLOCKED', 'reason':'NO_PROJECT_ID'})) 
   access_policy_title = request.args['access_policy_title']
   response = get_access_policy_name(token, access_policy_title, project_id)
   if 'response' in response:
@@ -718,7 +737,9 @@ def service_directory_webhook_fulfillment_status():
     return token_dict['response']
   token = token_dict['access_token']
 
-  project_id = request.args['project_id']
+  project_id = request.args.get('project_id', None)
+  if not project_id:
+    return Response(status=200, response=json.dumps({'status':'BLOCKED', 'reason':'NO_PROJECT_ID'})) 
   region = request.args['region']
 
   result = get_agents(token, project_id, region)
@@ -749,7 +770,9 @@ def update_service_directory_webhook_fulfillment():
   else:
     fulfillment = 'generic-web-service'
 
-  project_id = request.args['project_id']
+  project_id = request.args.get('project_id', None)
+  if not project_id:
+    return Response(status=200, response=json.dumps({'status':'BLOCKED', 'reason':'NO_PROJECT_ID'})) 
   bucket = request.args['bucket']
   region = request.args['region']
   webhook_name = request.args['webhook_name']
