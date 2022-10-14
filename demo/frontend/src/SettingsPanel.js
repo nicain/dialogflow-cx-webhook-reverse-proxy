@@ -156,17 +156,14 @@ function RefreshStateSpinner(props) {
 function SettingsPanelWithSpinner (props) {
   return (
     <>
-      <Grid container direction='row' alignItems="flex-start" columnSpacing={4}>
+      <Grid container direction='column'>
         <Grid item>
-          <SettingsPanel dataModel={props.dataModel}/>
-        </Grid>
-        <Grid item>
-          <Grid container direction='row' columnSpacing={4} justifyContent="flex-start">
-            <Paper variant="string" sx={{width: 370, px:2, py:2, my:1}}>
-              <Grid container direction='row' justifyContent="space-between">
+          <Grid container direction='row' sx={{pl:2, width: 360}}>
+            <Paper sx={{width: 350}} variant="string">
+              <Grid container direction='row' justifyContent="space-between" sx={{pt:2}}>
                 <Grid item>
                   <Typography variant="h5">
-                    GCP Project Resources:
+                    All Project Resources:
                   </Typography> 
                 </Grid>
                 <Grid item>
@@ -190,6 +187,9 @@ function SettingsPanelWithSpinner (props) {
               <RefreshStateSpinner dataModel={props.dataModel}/>
             </Grid>
           </Grid>
+        </Grid>
+        <Grid item>
+          <SettingsPanel dataModel={props.dataModel}/>
         </Grid>
       </Grid>
     </>

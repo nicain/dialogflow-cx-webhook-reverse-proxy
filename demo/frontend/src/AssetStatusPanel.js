@@ -5,8 +5,16 @@ import Paper from '@mui/material/Paper';
 
 function AssetStatusPanel(props) {
 
-  const sx = {
+  const sx_1 = {
     height:600,
+    width: PANEL_WIDTH+100,
+    px:1,
+    py:1,
+    my:1,
+  }
+
+  const sx_2 = {
+    height:292,
     width: PANEL_WIDTH+100,
     px:1,
     py:1,
@@ -17,7 +25,7 @@ function AssetStatusPanel(props) {
   if (props.dataModel.showServicesPanel.current) {
     ServicesPanelObj = (
       <Grid item>
-        <Paper variant="outlined" sx={sx}>
+        <Paper variant="outlined" sx={sx_1}>
           <ServicesPanel dataModel={props.dataModel}/>
         </Paper>
       </Grid>
@@ -30,20 +38,27 @@ function AssetStatusPanel(props) {
     <>
       <Grid container direction='row' columnSpacing={3} alignItems="flex-start">
         <Grid item>
-          <Paper variant="outlined" sx={sx}>
+          <Paper variant="outlined" sx={sx_1}>
             <NetworkPanel dataModel={props.dataModel}/>
           </Paper>
         </Grid>
+
         <Grid item>
-          <Paper variant="outlined" sx={sx}>
-            <ServiceDirectoryPanel dataModel={props.dataModel}/>
-          </Paper>
+          <Grid container direction='column'>
+            <Grid item>
+              <Paper variant="outlined" sx={sx_2}>
+                <ServiceDirectoryPanel dataModel={props.dataModel}/>
+              </Paper>
+            </Grid>
+            <Grid item>
+              <Paper variant="outlined" sx={sx_2}>
+                <AgentPanel dataModel={props.dataModel}/>
+              </Paper>
+            </Grid>
+          </Grid>
         </Grid>
-        <Grid item>
-          <Paper variant="outlined" sx={sx}>
-            <AgentPanel dataModel={props.dataModel}/>
-          </Paper>
-        </Grid>
+
+
         {ServicesPanelObj}
       </Grid>
     </>

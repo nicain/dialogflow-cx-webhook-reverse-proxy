@@ -60,11 +60,6 @@ function LiveDemoPage(props) {
       <Divider sx={{ my:2 }} orientation="horizontal" flexItem/>
       <QueryPollAssetStatus dataModel={props.dataModel}/>
       <Typography variant="h4" sx={{ mx:3, my:3 }}>
-        Configuration Dashboard
-      </Typography>
-      <SettingsPanelWithSpinner dataModel={props.dataModel}/>
-      <Divider sx={{ my:2 }} orientation="horizontal" flexItem/>
-      <Typography variant="h4" sx={{ mx:3, my:3 }}>
         Status Dashboard
       </Typography>
       <StateButtonGridAndImage dataModel={props.dataModel} liveMode={true}/>
@@ -72,7 +67,17 @@ function LiveDemoPage(props) {
       <Typography variant="h4" sx={{ mx:3, my:3 }}>
         Deployment Dashboard
       </Typography>
-      <AssetStatusPanel dataModel={props.dataModel}/>
+
+      <Grid container direction='row'>
+        <Grid item>
+          <SettingsPanelWithSpinner dataModel={props.dataModel}/>
+        </Grid>
+        <Grid item>
+          <AssetStatusPanel dataModel={props.dataModel}/>
+        </Grid>
+      </Grid>
+
+
     </>
   )
 }

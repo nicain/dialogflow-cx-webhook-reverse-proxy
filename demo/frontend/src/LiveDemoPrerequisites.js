@@ -4,6 +4,7 @@ import Box from '@mui/material/Box';
 import Paper from '@mui/material/Paper';
 import Link from '@mui/material/Link';
 import locationSettingsImage from "./location_settings.png";
+import Divider from '@mui/material/Divider';
 
 function LiveDemoPrerequisites() {
 
@@ -63,6 +64,15 @@ function LiveDemoPrerequisites() {
   return (
     <Paper sx={{ width: '75%', ml:2}} variant="string">
       <Typography variant="h3" sx={{my:3 }}>
+        Live Demo:
+      </Typography>
+
+      <Typography paragraph sx={{ ml:2 }}>
+        After walking through the Tutorials pages to gain a better understanding of how different configurations can improve the security of a webhook-enabled Dialogflow CX agent, it's time to try it for yourself. 
+      </Typography>
+
+      <Divider sx={{ my:1 }} orientation="horizontal" flexItem/>
+      <Typography variant="h4" sx={{my:3 }}>
         Before you Begin: Prerequisites
       </Typography>
 
@@ -100,7 +110,7 @@ function LiveDemoPrerequisites() {
         component="img"
         src={locationSettingsImage}
         alt="Location Settings"
-        sx={{ maxWidth:'400px', minWidth:'30%', my:2, py:0, ml:2, justifyContent:"flex-start" }} />
+        sx={{ maxWidth:'400px', minWidth:'30%', my:2, py:0, ml:4, justifyContent:"flex-start" }} />
 
       <Typography variant="h5" sx={{my:3 }}>Step 3: Log In</Typography>
       <Typography paragraph sx={{ ml:2 }}>
