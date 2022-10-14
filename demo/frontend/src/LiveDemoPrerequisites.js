@@ -60,6 +60,12 @@ function LiveDemoPrerequisites() {
     variant="body1">
       agent selector interface
     </Link>;
+  const apiConsole = <Link
+    target="_blank"
+    href="https://console.cloud.google.com/apis/dashboard?"
+    variant="body1">
+      "APIs & Services" menu in the Google Cloud Console
+    </Link>;
 
   return (
     <Paper sx={{ width: '75%', ml:2}} variant="string">
@@ -88,7 +94,8 @@ function LiveDemoPrerequisites() {
         title='Create New Project (No Organization)' 
         code={(
           "gcloud projects create ${project_id}"+"\n"+
-          "gcloud beta billing projects link ${project_id} --billing-account ${account_id}"
+          "gcloud beta billing projects link ${project_id} --billing-account ${account_id}"+"\n"+
+          "gcloud config set project ${project_id}"
         )}
       />
       <Typography paragraph sx={{ ml:2 }}>
@@ -98,11 +105,25 @@ function LiveDemoPrerequisites() {
         title='Create New Project' 
         code={(
           "gcloud projects create ${project_id} --organization=${organization_id}"+"\n"+
-          "gcloud beta billing projects link ${project_id} --billing-account ${account_id}"
+          "gcloud beta billing projects link ${project_id} --billing-account ${account_id}"+"\n"+
+          "gcloud config set project ${project_id}"
         )}
       />
 
-      <Typography variant="h5" sx={{my:3 }}>Step 2: Enable Dialogflow Location Settings</Typography>
+      <Typography variant="h5" sx={{my:3 }}>Step 2: Enable Cloud Resource Manager API</Typography>
+      <Typography paragraph sx={{ ml:2 }}>
+        The Cloud Resource Manager API is a necessary one-time enablement that allows Terraform to deploy (and remove) resources into your project on your behalf. To enable the API, visit the {apiConsole}, or use the gcloud CLI:
+      </Typography>
+      <SnippetWithCopyButton 
+        title='Enable Cloud Resource Manager API' 
+        code={(
+          "gcloud auth login ${principal}"+"\n"+
+          "gcloud config set project ${project_id}"+"\n"+
+          "gcloud services enable cloudresourcemanager.googleapis.com"
+        )}
+      />
+
+      <Typography variant="h5" sx={{my:3 }}>Step 3: Enable Dialogflow Location Settings</Typography>
       <Typography paragraph sx={{ ml:2 }}>
       Dialogflow Location Settings are required for using a regionalized Dialogflow agent because a regional agent is required for Service Directory webhook integration. More details on regionalization and Location settings for Dialogflow CX agents are {locationSettings}. To configure Location settings, click “Location settings” from the {agentSelectorInterface}, and select “Configure” for region “us-central1” (the default region for this demo).
       </Typography>
@@ -112,9 +133,9 @@ function LiveDemoPrerequisites() {
         alt="Location Settings"
         sx={{ maxWidth:'400px', minWidth:'30%', my:2, py:0, ml:4, justifyContent:"flex-start" }} />
 
-      <Typography variant="h5" sx={{my:3 }}>Step 3: Log In</Typography>
+      <Typography variant="h5" sx={{my:3 }}>Step 4: Log In</Typography>
       <Typography paragraph sx={{ ml:2 }}>
-        The Status Dashboard and Deployment Dashboard (below) uses a securely stored access token to deploy and update GCP resources on your behalf. To enable this workflow, you will need to log in using the button on the Navigation Sidebar, or the “Principal” dialog box in the Settings Dashboard (also below). This token will expire after one hour, so you may need to periodically re-authenticate the service. You can manually logout via these same menus, otherwise you will be logged-out automatically once the token expires.
+        The Status Dashboard and Deployment Dashboard (below) uses a securely stored access token to deploy and update GCP resources on your behalf. To enable this workflow, you will need to log in using the button on the Navigation Sidebar, or the “Principal” dialog box in the Deployment Dashboard (also below). This token will expire after one hour, so you may need to periodically re-authenticate the service. You can manually logout via these same menus, otherwise you will be logged-out automatically once the token expires.
       </Typography>
     </Paper>
   )

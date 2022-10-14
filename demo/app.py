@@ -406,6 +406,9 @@ def get_agents(token, project_id, region):
     if (r.json()['error']['status'] == 'PERMISSION_DENIED') and (r.json()['error']['message'].startswith('Dialogflow API has not been used in project')):
       response = Response(status=200, response=json.dumps({'status':'BLOCKED', 'reason':'DIALOGFLOW_API_DISABLED'}))
       return {'response':response}
+    if (r.json()['error']['status'] == 'PERMISSION_DENIED') and (r.json()['error']['message'].startswith('Caller does not have required permission')):
+      response = Response(status=200, response=json.dumps({'status':'BLOCKED', 'reason':'WRONG_PERMISSION'}))
+      return {'response':response}
     for details in r.json()['error']['details']:
       for violation in details['violations']:
         if violation['type'] == 'VPC_SERVICE_CONTROLS':
@@ -835,11 +838,9 @@ def get_principal():
 @app.route('/validate_project_id', methods=['get'])
 def validate_project_id():
   project_id = request.args.get('project_id', None)
-  print('project_id', project_id)
   if not project_id:
     return Response(status=200, response=json.dumps({'status':False}, indent=2))
   token_dict = get_token(request, token_type='access_token')
-  print('token_dict', token_dict)
   if 'response' in token_dict:
     print("ERROR TO DEBUG", token_dict['response'])
     return token_dict['response']
@@ -847,7 +848,6 @@ def validate_project_id():
 
   headers = {}
   headers['Authorization'] = f'Bearer {access_token}'
-  print('headers', headers)
   r = requests.get(f'https://cloudresourcemanager.googleapis.com/v1/projects/{project_id}', headers=headers)
 
   if r.status_code == 200:

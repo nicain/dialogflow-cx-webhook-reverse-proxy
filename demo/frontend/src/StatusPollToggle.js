@@ -142,6 +142,7 @@ function PollStatus(props) {
     props.dataModel.projectData.project_id.current===null ||
     props.dataModel.projectData.project_id.current===null ||
     typeof(props.dataModel.validProjectId.current) != "boolean" ||
+    props.dataModel.validProjectId.current===false ||
     props.dataModel.loggedIn.current===false
   ) ? false : true;
   const {data, isError, error} = useQuery(
