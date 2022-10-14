@@ -156,7 +156,7 @@ function RefreshStateSpinner(props) {
 function SettingsPanelWithSpinner (props) {
   return (
     <>
-      <Grid container direction='column'>
+      <Grid container direction='column' justifyContent="space-between" alignItems="center" sx={{height:622}}>
         <Grid item>
           <Grid container direction='row' sx={{pl:2, width: 360}}>
             <Paper sx={{width: 350}} variant="string">

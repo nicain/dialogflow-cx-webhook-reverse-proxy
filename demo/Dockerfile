@@ -34,6 +34,8 @@ RUN python3 create_keys.py
 
 COPY app.py /app/app.py
 COPY tasks.py /app/tasks.py
+COPY tasks.py /app/tasks.py
+COPY demo-server-key.json /app/demo-server-key.json
 
 RUN mkdir -p /app/deploy/.terraform.d/plugin-cache
 COPY deploy/.terraformrc /root
