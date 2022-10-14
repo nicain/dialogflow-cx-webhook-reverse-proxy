@@ -1,4 +1,3 @@
-import Box from '@mui/material/Box';
 import { Document, Page } from 'react-pdf';
 import diagram_sd from './VPC_SC_diagram_latest.pdf';
 import Paper from '@mui/material/Paper';

@@ -11,7 +11,7 @@ import io
 import tempfile
 import tasks
 from invoke import context
-import functools
+import collections
 
 
 from urllib.parse import urlparse 
@@ -85,6 +85,25 @@ def frontend(path):
   return response
 
 
+ 
+class LRU:
+ 
+  def __init__(self, func, maxsize=128):
+    self.cache = collections.OrderedDict()
+    self.func = func
+    self.maxsize = maxsize
+
+  def __call__(self, *args):
+    cache = self.cache
+    if args in cache:
+      cache.move_to_end(args)
+      return cache[args]
+    result = self.func(*args)
+    cache[args] = result
+    if len(cache) > self.maxsize:
+      cache.popitem(last=False)
+    return result
+
 
 class AESCipher:
 
@@ -118,8 +137,29 @@ def webhook_response_ok(response_dict):
     return False
   return True
 
+def get_token_from_auth_server(session_id, origin):
 
-def get_token(request, token_type='access'):
+  params = {
+    'session_id': session_id,
+    'origin': origin,
+  }
+
+  r = requests.get(AUTH_SERVICE_AUTH_ENDPOINT, params=params)
+  if r.status_code == 401:
+    app.logger.info(f'  auth-service "{AUTH_SERVICE_AUTH_ENDPOINT}" rejected request: {r.text}')
+    return {'response': Response(status=500, response=json.dumps({'status':'BLOCKED', 'reason':'REJECTED_REQUEST'}))}
+
+  zf = zipfile.ZipFile(io.BytesIO(r.content))
+  key_bytes_stream = zf.open('key').read()
+  decrypt = PKCS1_OAEP.new(key=pr_key)
+  decrypted_message = decrypt.decrypt(key_bytes_stream)
+  aes_cipher = AESCipher(key=decrypted_message)
+  auth_data = json.loads(aes_cipher.decrypt(zf.open('session_data').read()).decode())
+
+  return {'auth_data': auth_data}
+
+
+def get_token(request, token_type='access', cache=LRU(get_token_from_auth_server) ):
 
   if not request.cookies.get("session_id"):
     app.logger.info(f'get_token request did not have a session_id')
@@ -128,8 +168,9 @@ def get_token(request, token_type='access'):
   session_id = request.cookies.get("session_id")
   origin = request.host_url
 
-  response = get_token_from_auth_server(session_id, origin)
+  response = cache(session_id, origin)
   if 'response' in response:
+    cache.cache.pop((session_id, origin))
     return response
   auth_data = response['auth_data']
 
@@ -166,31 +207,6 @@ def get_token(request, token_type='access'):
     app.logger.info(response)
     return {'response': Response(status=500, response=json.dumps({'status':'BLOCKED', 'reason':response.lstrip()}))}
   return response
-
-
-@functools.cache
-def get_token_from_auth_server(session_id, origin):
-
-  params = {
-    'session_id': session_id,
-    'origin': origin,
-  }
-
-  r = requests.get(AUTH_SERVICE_AUTH_ENDPOINT, params=params)
-  if r.status_code == 401:
-    app.logger.info(f'  auth-service "{AUTH_SERVICE_AUTH_ENDPOINT}" rejected request: {r.text}')
-    return {'response': Response(status=500, response=json.dumps({'status':'BLOCKED', 'reason':'REJECTED_REQUEST'}))}
-
-  zf = zipfile.ZipFile(io.BytesIO(r.content))
-  key_bytes_stream = zf.open('key').read()
-  decrypt = PKCS1_OAEP.new(key=pr_key)
-  decrypted_message = decrypt.decrypt(key_bytes_stream)
-  aes_cipher = AESCipher(key=decrypted_message)
-  auth_data = json.loads(aes_cipher.decrypt(zf.open('session_data').read()).decode())
-
-  return {'auth_data': auth_data}
-
-
 
 
 @app.route('/session', methods=['GET'])
@@ -872,7 +888,8 @@ def asset_status():
       result = tasks.tf_plan(c, module, workdir, env, debug, target=target)
       if 'response' in result: return result['response']
       for hook in result['hooks']['refresh_complete']:
-        resource_id_dict[hook['resource']['addr']] = hook['id_value']
+        if 'id_value' in hook:
+          resource_id_dict[hook['resource']['addr']] = hook['id_value']
 
     if ACCESS_POLICY_RESOURCE in resource_id_dict:
       access_policy_id = resource_id_dict[ACCESS_POLICY_RESOURCE]

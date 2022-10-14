@@ -1,4 +1,4 @@
-import {useEffect} from "react";
+import {useEffect, useRef} from "react";
 import { QueryClient, QueryClientProvider, useQuery } from "react-query";
 import axios from "axios";
 import TextField from '@mui/material/TextField';
@@ -16,52 +16,50 @@ function GetPrincipal(props) {
     .get(props.endpoint)
     .then((res) => res.data)
   )
+  const tooltipTitle = useRef(null);
+  const href = useRef(null);
+  const loginEnabled = useRef(false);
+  const principal = useRef(null);
   useEffect(() => {
     if (data) {
       props.dataModel.projectData.principal.set(data.principal)
+      principal.current = data ? data.principal : ""
+      const queryStr = new URLSearchParams(props.dataModel.queryParams).toString();
+
+      if (principal.current==="" || principal.current===null || principal.current === undefined) {
+        tooltipTitle.current = 'Login'
+        href.current = `http://${window.location.host}/session?${queryStr}`
+        loginEnabled.current = true
+      } else {
+        tooltipTitle.current = 'Logout'
+        href.current = `http://${window.location.host}/logout?${queryStr}`
+        loginEnabled.current = false
+      }
     }
   })
 
-  // const principal = data ? data.principal : ""
-  // const queryStr = new URLSearchParams(props.dataModel.queryParams).toString();
-  // var tooltipTitle
-  // var button
-  // var href
-  // var loginEnabled
-  // if (principal==="" || principal===null || principal === undefined) {
-  //   tooltipTitle = 'Login'
-  //   button = <Login/>
-  //   href = `http://${window.location.host}/session?${queryStr}`
-  //   loginEnabled = true
-  // } else {
-  //   tooltipTitle = 'Logout'
-  //   button = <Logout/>
-  //   href = `http://${window.location.host}/logout?${queryStr}`
-  //   loginEnabled = false
-  // }
-  console.log(props.dataModel.projectData.principal.current);
   return (
   <div>
     <TextField 
       sx={{mx:2, width: 350, color: 'red'}}
       label={"Principal"} 
       variant="outlined" 
-      value={props.dataModel.projectData.principal.current===null ? '' : props.dataModel.projectData.principal.current} 
+      value={principal.current} 
       placeholder={"Principal"} 
       disabled={true}
-      InputLabelProps={{ shrink: props.dataModel.projectData.principal.current }}
-      // InputProps={{
-      //   style: { "backgroundColor": loginEnabled ? "#ffcdd2" : "transparent" },
-      //   endAdornment: (
-      //     <Tooltip title={tooltipTitle} disableInteractive arrow placement="top">
-      //       <InputAdornment position="end">
-      //         <IconButton edge='end' variant="outlined" href={href}>
-      //            {button}
-      //         </IconButton>
-      //       </InputAdornment>
-      //     </Tooltip>
-      //   ),
-      // }}
+      InputLabelProps={{ shrink: principal.current }}
+      InputProps={{
+        style: { "backgroundColor": loginEnabled.current ? "#ffcdd2" : "transparent" },
+        endAdornment: (
+          <Tooltip title={tooltipTitle.current} disableInteractive arrow placement="top">
+            <InputAdornment position="end">
+              <IconButton edge='end' variant="outlined" href={href.current}>
+                 {loginEnabled.current ? <Login/> : <Logout/>}
+              </IconButton>
+            </InputAdornment>
+          </Tooltip>
+        ),
+      }}
     />
   </div>
   )

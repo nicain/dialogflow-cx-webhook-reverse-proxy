@@ -136,13 +136,21 @@ function PollStatus(props) {
     .then((res) => res.data)
   }
 
+  const enabled = (
+    props.state.isUpdating.current || 
+    props.dataModel.projectData.project_id.current==='' ||
+    props.dataModel.projectData.project_id.current===null ||
+    props.dataModel.projectData.project_id.current===null ||
+    typeof(props.dataModel.validProjectId.current) != "boolean" ||
+    props.dataModel.loggedIn.current===false
+  ) ? false : true;
   const {data, isError, error} = useQuery(
     props.endpoint, queryFunction,
     {
       refetchInterval: 10000,
       onSuccess: onSuccess,
       retry: false,
-      enabled: !props.state.isUpdating.current && backendEnabled(props.dataModel),
+      enabled: enabled,
     }
   );
 
@@ -152,7 +160,7 @@ function PollStatus(props) {
       props.state.status.set(data.status)
       if (data.status === 'BLOCKED') {
         props.state.blocked.set(true)
-        if (data.reason==="POLICY_NOT_FOUND") {
+        if (data.reason==="POLICY_NOT_FOUND" || data.reason==="NO_ACCESS_POLICY") {
           props.state.status.set(false)
         } else if (
           data.reason==='TOKEN_EXPIRED' & 
