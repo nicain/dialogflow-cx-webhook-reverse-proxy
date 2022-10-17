@@ -1,4 +1,5 @@
 import * as React from 'react';
+import {useState} from "react";
 import { styled, useTheme } from '@mui/material/styles';
 import Box from '@mui/material/Box';
 import MuiDrawer from '@mui/material/Drawer';
@@ -98,7 +99,6 @@ const Drawer = styled(MuiDrawer, { shouldForwardProp: (prop) => prop !== 'open' 
 );
 
 function DrawerButton(props) {
-  
   const Icon = props.icon
   return (
     <Tooltip title={props.open ? "" : props.text} disableInteractive arrow placement="top">
@@ -152,7 +152,8 @@ function MiniDrawer(props) {
       state.blocked.set(false)
     }
   }
-  const [activePage, setActivePage] = useQueryState('page')
+  props.dataModel.activePage = {current: null, set: null};
+  [props.dataModel.activePage.current, props.dataModel.activePage.set] =  useQueryState('page');
 
   props.dataModel.projectData.project_id = {current: null, set: null};
   [props.dataModel.projectData.project_id.current, props.dataModel.projectData.project_id.set] = useQueryState('project_id')
@@ -161,7 +162,7 @@ function MiniDrawer(props) {
 
   const queryParams = {};
   if (typeof activePage==='string') {
-    queryParams['page'] = activePage
+    queryParams['page'] = props.dataModel.activePage.current
   }
   if (typeof props.dataModel.projectData.project_id.current==='string') {
     queryParams['project_id'] = props.dataModel.projectData.project_id.current
@@ -171,17 +172,19 @@ function MiniDrawer(props) {
   }
   props.dataModel.queryParams = queryParams
   const queryStr = new URLSearchParams(props.dataModel.queryParams).toString();
-  let loginButton = <DrawerButton open={open} text={"Login"} icon={Login} href={`http://${window.location.host}/session?${queryStr}`} dataModel={props.dataModel} targetPage={null} activePage={activePage}/>
-  let logoutButton = <DrawerButton open={open} text={"Logout"} icon={Logout} href={`http://${window.location.host}/logout?${queryStr}`} dataModel={props.dataModel} targetPage={null} activePage={activePage}/>
-  let HomeButton = <DrawerButton open={open} text={"Home"} icon={Home} dataModel={props.dataModel} targetPage='home' onClick={() => {setActivePage('home')}} activePage={activePage}/>
+  let loginButton = <DrawerButton open={open} text={"Login"} icon={Login} href={`http://${window.location.host}/session?${queryStr}`} dataModel={props.dataModel} targetPage={null} activePage={props.dataModel.activePage.current} onClick={() => {
+    props.dataModel.loginRedirect.set(true);
+  }}/>
+  let logoutButton = <DrawerButton open={open} text={"Logout"} icon={Logout} href={`http://${window.location.host}/logout?${queryStr}`} dataModel={props.dataModel} targetPage={null} activePage={props.dataModel.activePage.current}/>
+  let HomeButton = <DrawerButton open={open} text={"Home"} icon={Home} dataModel={props.dataModel} targetPage='home' onClick={() => {props.dataModel.activePage.set('home')}} activePage={props.dataModel.activePage.current}/>
   let TutorialButton = <DrawerButton open={open} text={"Tutorial"} icon={School} dataModel={props.dataModel} targetPage='tutorial' onClick={() => {
-    setActivePage('tutorial'); 
+    props.dataModel.activePage.set('tutorial'); 
     resetStateOnPageChange(props.dataModel)
-  }} activePage={activePage}/>
+  }} activePage={props.dataModel.activePage.current}/>
   let LiveDemoButton = <DrawerButton open={open} text={"Live Demo"} icon={Stream} dataModel={props.dataModel} targetPage='liveDemo' onClick={() => {
-    setActivePage('liveDemo');
+    props.dataModel.activePage.set('liveDemo');
     resetStateOnPageChange(props.dataModel)
-  }} activePage={activePage}/>
+  }} activePage={props.dataModel.activePage.current}/>
 
   return (
     <div>
@@ -229,7 +232,7 @@ function MiniDrawer(props) {
           <DrawerHeader />
           <PageContent
             dataModel={props.dataModel}
-            activePage={activePage}
+            activePage={props.dataModel.activePage.current}
           />
         </Box>
       </Box>

@@ -4,7 +4,7 @@ import { StateImage } from './StateSlides.js'
 import { AssetStatusPanel } from './AssetStatusPanel.js'
 import { SettingsPanelWithSpinner } from './SettingsPanel.js'
 import Grid from '@mui/material/Grid';
-
+import CircularProgress from '@mui/material/CircularProgress';
 import {QueryPollAssetStatus} from './AssetPollToggle.js'
 import Divider from '@mui/material/Divider';
 import {LiveDemoPrerequisites} from './LiveDemoPrerequisites.js'
@@ -56,15 +56,15 @@ function TutorialPage(props) {
 function LiveDemoPage(props) {
   return (
     <>
-      <LiveDemoPrerequisites />
+      <LiveDemoPrerequisites dataModel={props.dataModel}/>
       <Divider sx={{ my:2 }} orientation="horizontal" flexItem/>
       <QueryPollAssetStatus dataModel={props.dataModel}/>
-      <Typography variant="h4" sx={{ mx:3, my:3 }}>
+      <Typography variant="h4" sx={{ mx:3, my:3 }} id="statusDashboard">
         Status Dashboard
       </Typography>
       <StateButtonGridAndImage dataModel={props.dataModel} liveMode={true}/>
       <Divider sx={{ my:2 }} orientation="horizontal" flexItem/>
-      <Typography variant="h4" sx={{ mx:3, my:3 }}>
+      <Typography variant="h4" sx={{ mx:3, my:3 }} id="deploymentDashboard">
         Deployment Dashboard
       </Typography>
 
@@ -82,8 +82,22 @@ function LiveDemoPage(props) {
   )
 }
 
+function LoginRedirectPage(props) {
+  return (
+    <>
+      <Typography variant="h5" sx={{my:3 }}>
+        Redirecting to Login Page
+      </Typography>
+      <CircularProgress size={100} thickness={10}/>
+    </>
+  )
+}
+
 function PageContent(props) {
   const targetPage = props.activePage
+  if (props.dataModel.loginRedirect.current) {
+    return <LoginRedirectPage />
+  }
   if (targetPage === 'home') {
     return <HomePage dataModel={props.dataModel}/>
   } else if (targetPage === 'tutorial') {

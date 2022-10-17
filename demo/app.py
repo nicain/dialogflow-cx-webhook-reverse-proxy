@@ -963,7 +963,7 @@ def update_target():
     if targets:
       for target in targets:
         result = tasks.tf_plan(c, module, workdir, env, debug, target=target)
-        if 'response' in result: return result['response']
+        if result and 'response' in result: return result['response']
         result = tasks.tf_apply(c, module, workdir, env, debug, destroy, target=target)
     else:
         result = tasks.tf_plan(c, module, workdir, env, debug)
@@ -973,6 +973,9 @@ def update_target():
     result = tasks.tf_state_list(c, module, workdir, env, debug)
     if 'response' in result: return result["response"]
     resources = result['resources']
+
+    for resource in sorted(resources):
+      print(resource)
         
     return Response(status=200, response=json.dumps({'status':'OK', 'resources':resources}, indent=2))
 

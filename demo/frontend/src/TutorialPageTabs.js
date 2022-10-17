@@ -5,8 +5,6 @@ import Tab from '@mui/material/Tab';
 import Box from '@mui/material/Box';
 import Typography from '@mui/material/Typography';
 import Grid from '@mui/material/Grid';
-import RestartAlt from '@mui/icons-material/RestartAlt';
-import IconButton from '@mui/material/IconButton';
 import Link from '@mui/material/Link';
 import Paper from '@mui/material/Paper';
 import List from '@mui/material/List';
@@ -186,7 +184,7 @@ function TutorialPageTabs(props) {
 
   const webhookProxyFull = (
     <div>
-    <Typography paragraph  sx={{ ml:2}}>
+    <Typography paragraph  sx={{ ml:2, mb:0}}>
       Combining all of these strategies together results in a very secure communication architecture with multiple overlapping solutions layering to provide security:
     </Typography>
     <List sx={{ml:6}}>

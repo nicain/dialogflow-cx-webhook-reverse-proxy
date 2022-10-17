@@ -272,6 +272,7 @@ function DataModel () {
   const invertAssetCollectionSwitches = {current: null, set: null};
   const showServicesPanel = {current: null, set: null};
   const sessionExpiredModalOpen = {current: null, set: null};
+  const loginRedirect = {current: null, set: null};
 
   const allStates = {};
   allStates["dialogflowRestrictedState"] = getState();
@@ -293,6 +294,7 @@ function DataModel () {
   [invertAssetCollectionSwitches.current, invertAssetCollectionSwitches.set] = useState(false);
   [showServicesPanel.current, showServicesPanel.set] = useState(true);
   [sessionExpiredModalOpen.current, sessionExpiredModalOpen.set] = useState(false);
+  [loginRedirect.current, loginRedirect.set] = useState(false);
 
   const dataModel = {
     pageMapper: pageMapper,
@@ -307,6 +309,8 @@ function DataModel () {
     invertAssetCollectionSwitches:invertAssetCollectionSwitches,
     showServicesPanel:showServicesPanel,
     sessionExpiredModalOpen:sessionExpiredModalOpen,
+    loginRedirect:loginRedirect,
+    activePage: {current: null, set: null},
     queryParams: {},
   }
   return dataModel

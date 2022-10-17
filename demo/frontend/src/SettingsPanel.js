@@ -3,12 +3,6 @@ import {QueryClient, QueryClientProvider, useQuery } from "react-query";
 import Box from '@mui/material/Box';
 import TextField from '@mui/material/TextField';
 import Grid from '@mui/material/Grid';
-import Divider from '@mui/material/Divider';
-import IconButton from '@mui/material/IconButton';
-import InputAdornment from '@mui/material/InputAdornment';
-import Replay from '@mui/icons-material/Replay';
-import Tooltip from '@mui/material/Tooltip';
-import Link from '@mui/material/Link';
 import { QueryPrincipal } from './QueryPrincipal';
 import axios from "axios";
 import CircularProgress from '@mui/material/CircularProgress';
@@ -55,7 +49,6 @@ function ProjectIdInputField(props) {
       }
     }
   })
-
 
   var textFieldColor = props.dataModel.validProjectId.current ? "primary" : 'error'
   return (

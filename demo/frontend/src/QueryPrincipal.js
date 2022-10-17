@@ -53,8 +53,15 @@ function GetPrincipal(props) {
         endAdornment: (
           <Tooltip title={tooltipTitle.current} disableInteractive arrow placement="top">
             <InputAdornment position="end">
-              <IconButton edge='end' variant="outlined" href={href.current}>
-                 {loginEnabled.current ? <Login/> : <Logout/>}
+              <IconButton 
+                edge='end' 
+                variant="outlined" 
+                href={href.current}
+                onClick={() => {
+                  props.dataModel.loginRedirect.set(true);
+                }}
+              >
+                {loginEnabled.current ? <Login/> : <Logout/>}
               </IconButton>
             </InputAdornment>
           </Tooltip>

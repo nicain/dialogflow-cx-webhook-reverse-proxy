@@ -268,7 +268,6 @@ function ErrorDialog(props) {
 
 function ToggleAsset(props) {
   const asset = props.dataModel.assetStatus[props.target]
-  // const [alertBoxOpen, setAlertBoxOpen] = React.useState(false);
   const [errorBoxOpen, setErrorBoxOpen] = React.useState(false);
   const [resourceName, setResourceName] = React.useState(null);
   const completed = useRef(false);
@@ -276,15 +275,6 @@ function ToggleAsset(props) {
   const handleErrorBoxCancel = () => {
     setErrorBoxOpen(false);
   }
-
-  // const handleAlertBoxClose = () => {
-  //   setAlertBoxOpen(false);
-  // };
-  
-  // const handleAlertBoxDestroy = () => {
-  //   setAlertBoxOpen(false);
-  //   update.refetch();
-  // }
 
   function onSettled() {
     props.dataModel.terraformLocked.set(false);
@@ -427,12 +417,27 @@ function ToggleAsset(props) {
 
 
   var visibility
-  if (!props.dataModel.validProjectId.current || update.isFetching || tfImport.isFetching || typeof(asset.current) != "boolean" || props.dataModel.terraformLocked.current || asset.current==='BLOCKED') {
+  if (
+    !props.dataModel.validProjectId.current || 
+    update.isFetching || 
+    tfImport.isFetching || 
+    typeof(asset.current) != "boolean" || 
+    props.dataModel.terraformLocked.current || 
+    asset.current==='BLOCKED') {
     visibility = "hidden"
   } else {
     visibility = "visible"
   }
 
+  if (
+    props.target==="module.service_perimeter.google_access_context_manager_service_perimeter.service_perimeter[0]"
+    & (
+      props.dataModel.projectData.accessPolicyTitle.current===null ||
+      typeof(props.dataModel.projectData.accessPolicyTitle.current)==="undefined" ||
+      props.dataModel.projectData.accessPolicyTitle.current==="")
+    ) {
+      visibility = "hidden"
+  };
 
   var checked = typeof(asset.current) == "boolean" ? asset.current : false
   if (props.isModuleSwitch && props.dataModel.invertAssetCollectionSwitches.current && !ResourceCollectionIsAllSame(props.target, props.dataModel)) {
@@ -449,7 +454,8 @@ function ToggleAsset(props) {
   var name
   if (
     props.dataModel && 
-    props.dataModel.projectData.project_id.current != null
+    props.dataModel.projectData.project_id.current != null &&
+    props.dataModel.assetStatus[props.target].current === true
   ) {
     name = <Link target="_blank" href={props.href} variant="body1">{props.name}</Link>
   } else {
