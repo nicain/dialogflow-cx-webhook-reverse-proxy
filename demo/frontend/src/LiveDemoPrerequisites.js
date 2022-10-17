@@ -82,6 +82,12 @@ function LiveDemoPrerequisites(props) {
     variant="body1">
       set up organization policies
     </Link>;
+  const accessPolicyInstructions = <Link
+    target="_blank"
+    href="https://cloud.google.com/access-context-manager/docs/create-access-policy"
+    variant="body1">
+      Additional instructions are available here
+    </Link>;
 
   return (
     <Paper sx={{ width: '75%', ml:2}} variant="string">
@@ -109,8 +115,6 @@ function LiveDemoPrerequisites(props) {
       <Typography paragraph sx={{ ml:2 }}>
         <Box sx={{ fontWeight: 'bold' }}> Basic Deployment </Box>The <Link href='#statusDashboard'>Status Dashboard</Link> is identical to the Tutorial Panel, except enabling the slides on this page will update the Terraform-controlled resources in your Home Project. Once you are ready to begin, you can head to the <Link href='#deploymentDashboard'>Deployment Dashboard</Link> to get started. If you want to start with only the Dialogflow Agent with Webhook Fulfillment, click on the "Dialogflow Agent" slider in the "Webhook Agent" menu. This will also deploy the Cloud Function that fulfills the webhook, and update the agent to target that functions URI. The links to the left of each slider will open the resource in the GCP Console.
       </Typography>
-
-
 
       <Typography paragraph sx={{ ml:2 }}>
       <Box sx={{ fontWeight: 'bold' }}> Advanced: VPC Proxy Server </Box> To deploy a VPC reverse proxy server, and redirect traffic via mTLS (self-signed certificates), enable the "VPC Resources" and "Service Directory" sliders in the <Link href='#deploymentDashboard'>Deployment Dashboard</Link>. This might take some time, so be patient until the spinning "Refreshing State..." indicator is complete. After this, you will be able to redirect traffic through the VPC by selecting the "Route Dialogflow Through VPC Proxy?" toggle in the <Link href='#statusDashboard'>Status Dashboard</Link>. If you do not have an Access Policy Title configured in the input box, the "Service Perimeter" slider will not deploy—a policy is a prerequisite for this resource (See <Link href='#step4ConfigureAccessPolicy'>Step 4 (Optional): Configure your Access Policy</Link>, and "Advanced: VPC Service Controls" below for more information).
@@ -179,7 +183,15 @@ function LiveDemoPrerequisites(props) {
 
       <Typography variant="h5" sx={{my:3 }} id="step4ConfigureAccessPolicy">Step 4 (Optional): Configure your Access Policy</Typography>
       <Typography paragraph sx={{ ml:2 }}>
-        TODO
+        Using VPC Security Controls inside of your Home Project requires an Access Policy to be obtained, with your project_id assigned as "in-scope" for the project. If your account does not have these permissions, please ask your Organization Administrator to configure this for you ({accessPolicyInstructions}). Once you policy is created, you will be able to get the title of the policy from the GCP Console, or by using the gcloud CLI:
+        <SnippetWithCopyButton 
+          title='Get Access Policy Title' 
+          code={(
+            "gcloud access-context-manager policies list --organization ${organization_id}"
+          )}
+        />
+
+        
       </Typography>
 
       <Typography variant="h5" sx={{my:3 }}>Step 5: Log In</Typography>
