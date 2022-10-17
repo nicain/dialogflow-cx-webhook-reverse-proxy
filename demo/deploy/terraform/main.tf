@@ -175,6 +175,8 @@ module "services" {
     google_project_service.cloudfunctions,
     google_project_service.cloudbuild,
     google_project_service.accesscontextmanager,
+    google_project_service.iam,
+    google_project_service.cloudbilling,
   ]
 }
 
