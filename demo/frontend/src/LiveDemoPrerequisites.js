@@ -90,7 +90,7 @@ function LiveDemoPrerequisites(props) {
     </Link>;
 
   return (
-    <Paper sx={{ width: '75%', ml:2}} variant="string">
+    <Paper sx={{ width: '85%', ml:2}} variant="string">
       <Typography variant="h3" sx={{my:3 }}>
         Live Demo
       </Typography>
