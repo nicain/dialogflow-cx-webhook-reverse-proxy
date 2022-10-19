@@ -40,7 +40,7 @@ function getControlElem(title, state, timeout, blocked_by_timeout, queryEndpoint
       <Grid item>
         <Item sx={{my: 0}} variant="string">{toggleStatusElem}</Item>
       </Grid>
-      <Grid item sx={{ width: 330 }}>
+      <Grid item sx={{ width: 335 }}>
         <Typography variant="body1" align="right">
           {title}
         </Typography> 
@@ -79,7 +79,7 @@ function StateChangeButtonGrid(props){
         <Grid item>
           <Box sx={{my: 0, width: 58}} variant="string" />
         </Grid>
-        <Grid item sx={{ width: 330 }}>
+        <Grid item sx={{ width: 335 }}>
           <Typography variant="body1" align="right">
             Can Dialogflow contact Cloud Functions?
           </Typography> 
@@ -104,7 +104,7 @@ function StateChangeButtonGrid(props){
         </Grid>
 
         <Grid item>
-        {getControlElem("Restrict Cloudfunctions Access to VPC?",
+        {getControlElem("Restrict Cloudfunctions Access (VPC-SC)?",
           cloudfunctionsRestrictedState, 15, null,
           "/restricted_services_status_cloudfunctions", 
           "/update_security_perimeter_cloudfunctions", 
@@ -112,7 +112,7 @@ function StateChangeButtonGrid(props){
         </Grid>
 
         <Grid item>
-        {getControlElem("Restrict Dialogflow Access to VPC?",
+        {getControlElem("Restrict Dialogflow Access (VPC-SC)?",
           dialogflowRestrictedState, 15, null,
           "/restricted_services_status_dialogflow", 
           "/update_security_perimeter_dialogflow", 

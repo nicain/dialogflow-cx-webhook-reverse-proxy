@@ -161,7 +161,7 @@ function MiniDrawer(props) {
   [props.dataModel.projectData.accessPolicyTitle.current, props.dataModel.projectData.accessPolicyTitle.set] = useQueryState('access_policy_title')
 
   const queryParams = {};
-  if (typeof activePage==='string') {
+  if (typeof props.dataModel.activePage.current==='string') {
     queryParams['page'] = props.dataModel.activePage.current
   }
   if (typeof props.dataModel.projectData.project_id.current==='string') {
