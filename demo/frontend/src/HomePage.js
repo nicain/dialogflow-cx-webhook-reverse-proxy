@@ -34,6 +34,13 @@ function HomePage(props) {
     Quickstart
   </Link>;
 
+  const policyEditor = <Link
+  target="_blank"
+  href="https://cloud.google.com/access-context-manager/docs/access-control#required-roles"
+  variant="body1">
+    roles/accesscontextmanager.policyEditor
+  </Link>;
+
   
   
   const StaticPage = [{current: null, set: null}, {current: null, set: null}];
@@ -134,7 +141,7 @@ function HomePage(props) {
         The images above illustrate opposite ends of this spectrum. The diagram on the left depicts a "proof-of-concept" resource architecture, with two main components: A Dialogflow CX Agent which communicates via a webhook to a Cloud Function. While self-contained in this diagram, the business logic necessary to fulfill the webhook request might not be fully encapsulated by the Cloud Function, requiring further egress to other services such as BigQuery or Cloud Storage. Minimal security protections (only IAM permissions protecting  ingress to Dialogflow CX and Cloud Functions for all authenticated users) represented by the red-dotted line from  "User" icons with the blocked-key indicating unauthenticated.
       </Typography>
       <Typography paragraph>
-        The diagram on the right adds several additional resources and configurations to the deployment: IAM and ingress protections on the Cloud Function, two VPC-SC service perimeters and a reverse proxy server running in Google Compute Engine (GCE). The service perimeters are represented by the red bands around the Dialogflow CX resource group and the Cloud Functions resource group, and indicate that external access to these service APIs is blocked. The VPC resource block contains the GCE instance functioning as a reverse proxy server.
+        The diagram on the right adds several additional resources and configurations to the deployment: IAM and ingress protections on the Cloud Function, two VPC-SC perimeters and a reverse proxy server running in Google Compute Engine (GCE). The perimeters are represented by the red bands around the Dialogflow CX resource group and the Cloud Functions resource group, and indicate that external access to these service APIs is blocked. The VPC resource block contains the GCE instance functioning as a reverse proxy server.
       </Typography>
   
       <Typography variant="h4" sx={{my:3}}>
@@ -227,8 +234,39 @@ function HomePage(props) {
         Securing APIs: VPC Service Control Perimeters
       </Typography>
       <Typography paragraph sx={{ml:2}}>
-        TODO
+        A VPC Service Control Perimeter provides the final layer of security for a production deployment, by blocking usage of an api (in this case, cloudfunctions.googleapis.com or dialogflow.googleapis.com) from users outside if the VPC. This can prevent, for example, a compromised access token from being used to access, or even list, any service resources from the open internet. While all usage of the  dialogflow.googleapis.com domain will be restricted by the perimeter, the Cloud Functions perimeter only disables access to the control plane of the service. Activating this perimeter would then prevent creating, deleting, or updating a cloud function, but not its invocation; this is because the domain for a deployed function is different from the service control domain (it is usually on a subdomain of cloudfunctions.net).
       </Typography>
+      <Typography paragraph sx={{ml:2}}>
+        Configuring a VPC-SC is only possible for projects that are members of a GCP Organization, and requires an existing access policy resource be configured for the Organization (and the project be included "in-scope" for the access policy). Creating an access policy requires specialized organizational privileges ({policyEditor}).
+      </Typography>
+      <SnippetWithCopyButton 
+        language="bash"
+        title='Create A Scoped Access Policy'
+        code={(
+          "gcloud access-context-manager policies create \\"+"\n"+
+          "  --organization ${organization_id} \\"+"\n"+
+          "  --scopes=projects/${project_id} \\"+"\n"+
+          "  --title ${policy_title}"
+        )}
+      />
+      <Typography paragraph sx={{ml:2}}>
+        Once you create this policy (or an Organization administrator creates it for you), you can use it to create a service perimeter for the APIs in your project. This can be accomplished using the gcloud CLI by referring to the policy name (not the title), or by using the GCP Console. In the <Link style={{cursor:"pointer"}} onClick={()=>{props.dataModel.activePage.set('liveDemo')}}>Live Demo</Link> you will provide the access policy title and let the Deployment Dashboard create the perimiter under that policy for you.
+      </Typography>
+      <SnippetWithCopyButton 
+        language="bash"
+        title='Create Security Perimeter'
+        code={(
+          "policy_id=$( gcloud access-context-manager policies list \\"+"\n"+
+          "  --organization=\${ORGANIZATION?} \\"+"\n"+
+          "  --format=\"json\" | \\"+"\n"+
+          "jq -r --arg policy_title \${policy_title} \\"+"\n"+
+          "  '.[] | select(.title | contains($policy_title)) | .name' | \\"+"\n"+
+          "tr '/' '\\n' | tail -n 1)"+"\n"+
+          "gcloud access-context-manager perimeters create \${perimeter_name} \\"+"\n"+
+          "  --policy=${policy_id}"
+        )}
+      />
+
     </Paper>
   )
 }
