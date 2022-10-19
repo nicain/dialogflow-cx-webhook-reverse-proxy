@@ -193,7 +193,7 @@ function GenericErrorDialog(props) {
       onClose={() => {}}
     >
       <DialogTitle>
-        {`Error Encountered when deploying ${props.target}`} 
+        {`Error Encountered:`} 
       </DialogTitle>
       <DialogContent>
         <DialogContentText style={{whiteSpace: 'pre'}}>
@@ -247,7 +247,9 @@ function ErrorDialog(props) {
   }
 
   useEffect(() => {
-    props.setResourceName(resourceName);
+    if (resourceName) {
+      props.setResourceName(resourceName);
+    }
   }, [props, resourceName]);
 
   if (responseType==="STATE_LOCK") {
@@ -506,6 +508,7 @@ function ToggleAsset(props) {
 
 function PollAssetStatus(props) {
   const completed = useRef(false);
+  const [errorBoxOpen, setErrorBoxOpen] = React.useState(false);
 
   function onSettled() {
     props.dataModel.terraformLocked.set(false);
@@ -528,30 +531,48 @@ function PollAssetStatus(props) {
     ).then((res) => res.data)
   }
 
-  const {data} = useQuery(
+  function onError (error) {
+    console.log('1', errorBoxOpen);
+    setErrorBoxOpen(true);
+    console.log('2',errorBoxOpen);
+  };
+
+  const assetStatus = useQuery(
     ["/asset_status", props.dataModel.projectData.project_id.current], queryFunction,
     {
       refetchInterval: (props.dataModel.terraformLocked.current? false : 600000),
       onSettled: onSettled,
       retry: false,
       enabled: backendEnabled(props.dataModel),
+      onError: onError,
     }
   );
 
   useEffect(() => {
-    if (data && completed.current){
-      if (data.status==='BLOCKED') {
-        console.log(data.reason)
+    if (assetStatus.data && completed.current){
+      if (assetStatus.data.status==='BLOCKED') {
+        console.log(assetStatus.data.reason)
       } else {
         completed.current = false;
         for (var key in props.dataModel.assetStatus) {
-          props.dataModel.assetStatus[key].set(data.resources.includes(key))
+          props.dataModel.assetStatus[key].set(assetStatus.data.resources.includes(key))
         }
-        props.dataModel.projectData.accessPolicyTitle.set(data.accessPolicyTitle)
+        props.dataModel.projectData.accessPolicyTitle.set(assetStatus.data.accessPolicyTitle)
       }
     }
   })
-  return <></>
+  
+  const handleErrorBoxCancel = () => {
+    setErrorBoxOpen(false);
+  }
+
+  return (
+  <ErrorDialog 
+    open={errorBoxOpen} 
+    onClickCancel={handleErrorBoxCancel}
+    error={assetStatus.error}
+    dataModel={props.dataModel}
+  />)
 }
 
 

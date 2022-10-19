@@ -130,11 +130,39 @@ function HomePage(props) {
       </Grid>
 
       <Typography paragraph sx={{my:3 }}>
-        The images above illustrate opposite ends of this spectrum. The diagram on the left depicts a "proof-of-concept" resource architecture, with two main components: A Dialogflow CX Agent which communicates via a webhook to a Cloud Function. While self-contained in this diagram, the business logic necessary to fulfill the webhook request might not be fully encapsulated by the Cloud Function, requiring further egress to other services such as BigQuery or Cloud Storage. No security layers are implemented in this scenario, allowing ingress to Dialogflow for all authenticated users, and to Cloud Functions for all users (authenticated or not!).
+        The images above illustrate opposite ends of this spectrum. The diagram on the left depicts a "proof-of-concept" resource architecture, with two main components: A Dialogflow CX Agent which communicates via a webhook to a Cloud Function. While self-contained in this diagram, the business logic necessary to fulfill the webhook request might not be fully encapsulated by the Cloud Function, requiring further egress to other services such as BigQuery or Cloud Storage. No security layers are implemented in this scenario, allowing ingress to Dialogflow for all authenticated users, and to Cloud Functions for all users (authenticated or not, represented by the 4 "User" icons with the blocked-key indicating unauthenticated).
       </Typography>
       <Typography paragraph>
-        The diagram on the right adds additional resources to the deployment: two VPC-SC service perimeters . The service perimeters are represented by the red bands around the Dialogflow CX resource group and the Cloud Functions resource group, and indicate that external access to these service APIs is blocked. Additionally, the VPC resource block contains Google Compute Engine (GCE) instance functioning as a reverse proxy server.
+        The diagram on the right adds several additional resources and configurations to the deployment: IAM and ingress protections on the Cloud Function, two VPC-SC service perimeters and a reverse proxy server running in Google Compute Engine (GCE). The service perimeters are represented by the red bands around the Dialogflow CX resource group and the Cloud Functions resource group, and indicate that external access to these service APIs is blocked. The VPC resource block contains the GCE instance functioning as a reverse proxy server.
       </Typography>
+
+
+      <Typography variant="h5" sx={{my:3, ml:2}}>
+        Securing Webhooks with IAM Permissions
+      </Typography>
+      <Typography paragraph>
+        TODO
+      </Typography>
+  
+      <Typography variant="h5" sx={{my:3, ml:2}}>
+        Securing APIs: VPC Service Control Perimeters
+      </Typography>
+      <Typography paragraph>
+        TODO
+      </Typography>
+
+      <Typography variant="h5" sx={{my:3, ml:2}}>
+        Securing Webhooks with Webhook Ingress from VPC 
+      </Typography>
+      <Typography paragraph>
+        TODO
+      </Typography>
+      
+
+
+
+
+
     </Paper>
   )
 }
