@@ -139,6 +139,7 @@ function LiveDemoPrerequisites(props) {
         If you are new to Google Cloud Platform, {newToGCPInstructions} will guide you through the process of creating your first project. Some resources necessary for the demo (VPC Service Controls, and Dialogflow) fall outside the Free Usage tier, so you will need to enable billing for that project with {cloudBilling}. {freeTrialCredits} are available for new users to help get you started. 
       </Typography>
       <SnippetWithCopyButton 
+        language="bash"
         title='Create New Project (No Organization)' 
         code={(
           "gcloud projects create ${project_id}"+"\n"+
@@ -149,7 +150,8 @@ function LiveDemoPrerequisites(props) {
       <Typography paragraph sx={{ ml:2 }}>
         If you would like to configure VPC Service Controls (VPC-SC) for your demo project, it must reside in a {GCPOrganization} and be configured as {withinScope} of a VPC-SC Access Policy for its Organization. If you do not have sufficient permissions ({policyEditor}) within your organization, contact your Organization Administrator to create and configure a policy for you after you create the project: 
       </Typography>
-      <SnippetWithCopyButton 
+      <SnippetWithCopyButton
+        language="bash"
         title='Create New Project' 
         code={(
           "gcloud projects create ${project_id} --organization=${organization_id}"+"\n"+
@@ -162,7 +164,8 @@ function LiveDemoPrerequisites(props) {
       <Typography paragraph sx={{ ml:2 }}>
         The Cloud Resource Manager API is a necessary one-time enablement that allows Terraform to deploy (and remove) resources into your project on your behalf. To enable the API, visit the {apiConsole}, or use the gcloud CLI:
       </Typography>
-      <SnippetWithCopyButton 
+      <SnippetWithCopyButton
+        language="bash"
         title='Enable Cloud Resource Manager API' 
         code={(
           "gcloud auth login ${principal}"+"\n"+
@@ -184,7 +187,8 @@ function LiveDemoPrerequisites(props) {
       <Typography variant="h5" sx={{my:3 }} id="step4ConfigureAccessPolicy">Step 4 (Optional): Configure your Access Policy</Typography>
       <Typography paragraph sx={{ ml:2 }}>
         Using VPC Security Controls inside of your Home Project requires an Access Policy to be obtained, with your project_id assigned as "in-scope" for the project. If your account does not have these permissions, please ask your Organization Administrator to configure this for you ({accessPolicyInstructions}). Once you policy is created, you will be able to get the title of the policy from the GCP Console, or by using the gcloud CLI:
-        <SnippetWithCopyButton 
+        <SnippetWithCopyButton
+          language="bash"
           title='Get Access Policy Title' 
           code={(
             "gcloud access-context-manager policies list --organization ${organization_id}"

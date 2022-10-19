@@ -33,7 +33,7 @@ const CopyToClipboardButton = (props) => {
 
 function SnippetWithCopyButton(props) {
   return (
-    <Card sx={{ maxWidth:'700px', minWidth:'70%', my:2, py:0, ml:4, justifyContent:"flex-start" }} >
+    <Card sx={{ maxWidth:'700px', minWidth:'75%', my:2, py:0, ml:4, justifyContent:"flex-start" }} >
       <CardContent>
         <Grid container alignItems="center" direction="row">
           <Grid item>
@@ -45,7 +45,7 @@ function SnippetWithCopyButton(props) {
             </Typography>
           </Grid>
         </Grid>
-        <SyntaxHighlighter language={"bash"}>    
+        <SyntaxHighlighter language={props.language}>    
           {props.code}
         </SyntaxHighlighter>
 

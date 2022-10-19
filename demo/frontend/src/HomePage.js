@@ -9,6 +9,7 @@ import List from '@mui/material/List';
 import ListItem from '@mui/material/ListItem';
 import ListItemText from '@mui/material/ListItemText';
 import Divider from '@mui/material/Divider';
+import {SnippetWithCopyButton} from './SnippetWithCopyButton.js'
 
 function HomePage(props) {
 
@@ -104,7 +105,7 @@ function HomePage(props) {
       <Grid container direction='row' columnSpacing={3} alignItems="center" justifyContent="space-around" >
         <Grid item>
           <Grid container direction='column' alignItems="center" justifyContent="center">
-            <ArchitectureImage renderedPageNumber={StaticPage[1]} currPage={32} pageHeight={200} width={470}/>
+            <ArchitectureImage renderedPageNumber={StaticPage[1]} currPage={28} pageHeight={200} width={470}/>
             <Typography variant="h7">
               Proof-of-Concept
             </Typography>
@@ -130,39 +131,104 @@ function HomePage(props) {
       </Grid>
 
       <Typography paragraph sx={{my:3 }}>
-        The images above illustrate opposite ends of this spectrum. The diagram on the left depicts a "proof-of-concept" resource architecture, with two main components: A Dialogflow CX Agent which communicates via a webhook to a Cloud Function. While self-contained in this diagram, the business logic necessary to fulfill the webhook request might not be fully encapsulated by the Cloud Function, requiring further egress to other services such as BigQuery or Cloud Storage. No security layers are implemented in this scenario, allowing ingress to Dialogflow for all authenticated users, and to Cloud Functions for all users (authenticated or not, represented by the 4 "User" icons with the blocked-key indicating unauthenticated).
+        The images above illustrate opposite ends of this spectrum. The diagram on the left depicts a "proof-of-concept" resource architecture, with two main components: A Dialogflow CX Agent which communicates via a webhook to a Cloud Function. While self-contained in this diagram, the business logic necessary to fulfill the webhook request might not be fully encapsulated by the Cloud Function, requiring further egress to other services such as BigQuery or Cloud Storage. Minimal security protections (only IAM permissions protecting  ingress to Dialogflow CX and Cloud Functions for all authenticated users) represented by the red-dotted line from  "User" icons with the blocked-key indicating unauthenticated.
       </Typography>
       <Typography paragraph>
         The diagram on the right adds several additional resources and configurations to the deployment: IAM and ingress protections on the Cloud Function, two VPC-SC service perimeters and a reverse proxy server running in Google Compute Engine (GCE). The service perimeters are represented by the red bands around the Dialogflow CX resource group and the Cloud Functions resource group, and indicate that external access to these service APIs is blocked. The VPC resource block contains the GCE instance functioning as a reverse proxy server.
       </Typography>
-
-
-      <Typography variant="h5" sx={{my:3, ml:2}}>
-        Securing Webhooks with IAM Permissions
-      </Typography>
-      <Typography paragraph>
-        TODO
-      </Typography>
   
-      <Typography variant="h5" sx={{my:3, ml:2}}>
-        Securing APIs: VPC Service Control Perimeters
-      </Typography>
-      <Typography paragraph>
-        TODO
-      </Typography>
-
-      <Typography variant="h5" sx={{my:3, ml:2}}>
+      <Typography variant="h4" sx={{my:3}}>
         Securing Webhooks with Webhook Ingress from VPC 
       </Typography>
-      <Typography paragraph>
+      <Typography paragraph sx={{ml:2}}>
+        Allowing access from the open internet to a Cloud Function that might return sensitive information is a security concern, even if IAM permissions are already in-place. Credentials are validated based based on a user token, and if this token is accidentally mishandled (or maliciously compromised) a data breach might result. Because of this, it is a good idea to add Ingress protections to the configuration, to ensure that only requests originating from a VPC (not the open internet) are validated. 
+      </Typography>
+      <Typography paragraph sx={{ml:2}}>
+        However, this poses a challenge when interacting with Dialoglow; webhook requests from the agent will originate from outside the VPC, and therefore receive a 403 Forbidden response. A reverse proxy service (RPS) running inside the VPC can receive the agent request, and redirect it Cloud Functions for fulfillment.  There are, however several complications. First of all, Dialogflow has to be able to find the RPS—this is accomplished by configuring a Service Directory Service (and Endpoint) to point Dialogflow to the internal IP address on the VPC. 
+      </Typography>
+      <SnippetWithCopyButton 
+        language="bash"
+        title='Create Service Directory Endpoint' 
+        code={(
+          "gcloud service-directory namespaces create ${namespace} --location ${region}"+"\n"+
+          "gcloud service-directory services create ${service} --namespace ${namespace} --location ${region}"+"\n"+
+          "gcloud service-directory endpoints create ${endpoint} \\"+"\n"+
+          "  --service=${service} \\"+"\n"+
+          "  --namespace=${namespace} \\"+"\n"+
+          "  --location=${location} \\"+"\n"+
+          "  --address=${address} \\"+"\n"+
+          "  --port=443 \\"+"\n"+
+          "  --network=${vpc_network}"
+        )}
+      />
+      <Typography paragraph sx={{ml:2}}>
+        Next, validation of the request must be configured; this is accomplished by setting up mutual TLS authentication between Dialogflow and the RPS. In this example we are self-signing the server/client certificate/key pair; the common name for the server ("CN" below) along with the certificate file (in DER format) are provided to Dialogflow then configuring the webhook.
+      </Typography>
+      <SnippetWithCopyButton
+        language="bash"
+        title='Create mTLS Key Pair' 
+        code={(
+          "CN=webhook.internal"+"\n"+
+          "ssl_key=server.key"+"\n"+
+          "ssl_csr=server.csr"+"\n"+
+          "ssl_crt=server.crt"+"\n"+
+          "ssl_der=server.der"+"\n"+
+          "openssl genrsa -out ${ssl_key} 2048"+"\n"+
+          "openssl req -nodes -new -sha256 -key ${ssl_key} -subj \"/CN=${CN}\" -out ${ssl_csr}"+"\n"+
+          "openssl x509 -req -days 3650 -in ${ssl_csr} -signkey ${ssl_key} -out ${ssl_crt} \\" +"\n"+
+          "  -extfile <(printf \"\\nsubjectAltName='DNS:${CN}'\")"+"\n"+
+          "openssl x509 -in ${ssl_crt} -out ${ssl_der} -outform DER"
+        )}
+      />
+      <Typography paragraph sx={{ml:2}}>
+        Once the request is received and authenticated by the RPS, the final step is to redirect the request to the Cloud Function. The RPS validates that authorization token (from the request header) originates from the Dialogflow CX Service Agent, and then requests a new token to authenticate itself (on behalf of Dialogflow) with the token audience set to the Cloud Functions API instead of the common name (CN) of the RPS.
+      </Typography>
+      <SnippetWithCopyButton
+        language="python" 
+        title='Verify Request Token Redirect Request to Cloud Functions' 
+        code={(
+          "import os"+"\n"+
+          "import requests"+"\n"+
+          ""+"\n"+
+          "from flask import Request, abort"+"\n"+
+          "from google.auth.transport import requests as reqs"+"\n"+
+          "from google.oauth2 import id_token"+"\n"+
+          "import google.auth.transport.requests"+"\n"+
+          ""+"\n"+
+          ""+"\n"+
+          "def redirect_request(request: Request):"+"\n"+
+          "  audience = os.environ['webhook_trigger_uri']"+"\n"+
+          "  auth_req = google.auth.transport.requests.Request()"+"\n"+
+          "  token = google.oauth2.id_token.fetch_id_token(auth_req, audience)"+"\n"+
+          "  new_headers = {}"+"\n"+
+          "  new_headers['Content-type'] = 'application/json'"+"\n"+
+          "  new_headers['Authorization'] = f'Bearer {token}'"+"\n"+
+          "  return requests.post(audience, json=request.get_json(), headers=new_headers)"+"\n"+
+          ""+"\n"+
+          ""+"\n"+
+          "def validate_request(request: Request):"+"\n"+
+          "  project_number = os.environ['project_number']"+"\n"+
+          "  authorized_user = f'service-{project_number}@gcp-sa-dialogflow.iam.gserviceaccount.com'"+"\n"+
+          "  auth = request.headers.get('Authorization', None)"+"\n"+
+          "  token = auth[7:]  # Remove 'Bearer: ' prefix"+"\n"+
+          "  info = id_token.verify_oauth2_token(token, reqs.Request())"+"\n"+
+          "  if info['email'] != authorized_user:"+"\n"+
+          "    return abort(403)"
+        )}
+      />
+
+
+
+      <Typography paragraph sx={{ml:2}}>
+        If any (or all!) of these configurations sound complicated, you can head over to the <Link style={{cursor:"pointer"}} onClick={()=>{props.dataModel.activePage.set('liveDemo')}}>Live Demo</Link> page, where you can deploy a working configuration into your project and then inspect its configuration. The working source code for these systems is on GitHub.
+      </Typography>
+
+      <Typography variant="h4" sx={{my:3}}>
+        Securing APIs: VPC Service Control Perimeters
+      </Typography>
+      <Typography paragraph sx={{ml:2}}>
         TODO
       </Typography>
-      
-
-
-
-
-
     </Paper>
   )
 }

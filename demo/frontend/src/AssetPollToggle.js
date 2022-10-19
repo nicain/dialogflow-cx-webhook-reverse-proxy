@@ -532,9 +532,7 @@ function PollAssetStatus(props) {
   }
 
   function onError (error) {
-    console.log('1', errorBoxOpen);
     setErrorBoxOpen(true);
-    console.log('2',errorBoxOpen);
   };
 
   const assetStatus = useQuery(
