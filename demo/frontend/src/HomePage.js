@@ -53,10 +53,10 @@ function HomePage(props) {
         Dialogflow CX with Webhook Fulfillment:
       </Typography>
       <Typography variant="h4" sx={{my:3 }}>
-        Tutorial and Live Demo
+        Tutorial and Interactive Launch Pad
       </Typography>
       <Typography paragraph>
-        Dialogflow CX enables users to design rich, intuitive flows for interactive conversational agents. With many {powerfulFeatures}, Dialogflow CX agents can handle user interactions ranging from simple requests for scripted information, to detailed interactive responses capable of integrating external data sources and models. The main mechanism to achieve these advanced use cases is through its  {webhookIntegration}. The purpose of this Tutorial and Live Demo site is to provide information (and a working example) of Dialogflow with Webhooks for advanced users, as their use-case scales up from early exploratoration to a production deployment with a virtual private cloud (VPC).
+        Dialogflow CX enables users to design rich, intuitive flows for interactive conversational agents. With many {powerfulFeatures}, Dialogflow CX agents can handle user interactions ranging from simple requests for scripted information, to detailed interactive responses capable of integrating external data sources and models. The main mechanism to achieve these advanced use cases is through its  {webhookIntegration}. The purpose of this Tutorial and Interactive Demo is to provide information (and a working example) of Dialogflow with Webhooks for advanced users, as their use-case scales up from early exploratoration to a production deployment with a virtual private cloud (VPC).
       </Typography>
       <List sx={{ml:6}}>
         <ListItem  style={{ display: 'list-item', padding:0,listStyleType: "disc", }}>
@@ -69,7 +69,7 @@ function HomePage(props) {
         </ListItem>
         <ListItem  style={{ display: 'list-item', padding:0,listStyleType: "disc", }}>
           <Link style={{cursor:"pointer"}} onClick={()=>{props.dataModel.activePage.set('liveDemo')}}>
-            <ListItemText primary="Live Demo"/>
+            <ListItemText primary="Launch Pad: Live Demo"/>
           </Link>
           <Typography paragraph>
             Use Terraform to easily deploy these user scenarios into a project that you control. Use links in the "Deployment Dashboard" to view all of the required resources in your project, and the Status Dashbord to update their configuration to explore how changes to the security strategy alter the resources.

@@ -28,6 +28,7 @@ import { PageContent } from './PageContent.js';
 import { SessionExpiredModal } from './SessionExpiredModal.js';
 import { getCookie, LOGIN_COOKIE_NAME } from './Utilities.js';
 import {useQueryState} from "./UseQueryState.js"
+import RocketLaunchIcon from '@mui/icons-material/RocketLaunch';
 
 
 const drawerWidth = 240;
@@ -181,7 +182,7 @@ function MiniDrawer(props) {
     props.dataModel.activePage.set('tutorial'); 
     resetStateOnPageChange(props.dataModel)
   }} activePage={props.dataModel.activePage.current}/>
-  let LiveDemoButton = <DrawerButton open={open} text={"Live Demo"} icon={Stream} dataModel={props.dataModel} targetPage='liveDemo' onClick={() => {
+  let LiveDemoButton = <DrawerButton open={open} text={"Launch Pad"} icon={RocketLaunchIcon} dataModel={props.dataModel} targetPage='liveDemo' onClick={() => {
     props.dataModel.activePage.set('liveDemo');
     resetStateOnPageChange(props.dataModel)
   }} activePage={props.dataModel.activePage.current}/>

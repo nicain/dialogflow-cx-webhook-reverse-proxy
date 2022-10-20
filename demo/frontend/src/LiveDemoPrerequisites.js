@@ -92,7 +92,7 @@ function LiveDemoPrerequisites(props) {
   return (
     <Paper sx={{ width: '85%', ml:2}} variant="string">
       <Typography variant="h3" sx={{my:3 }}>
-        Live Demo
+        Launch Pad: Live Demo
       </Typography>
       <Typography paragraph sx={{ ml:2, mb:0}}>
         After working through the <Link style={{cursor:"pointer"}} onClick={()=>{props.dataModel.activePage.set('tutorial')}}>Tutorials</Link> pages to gain a better understanding of how different configurations can improve the security of a webhook-enabled Dialogflow CX agent, it's time to try it for yourself with a Live Demo that is fully under your control. This page contains three main sections to 
@@ -109,7 +109,7 @@ function LiveDemoPrerequisites(props) {
         </ListItem>
       </List>
       <Typography paragraph sx={{ ml:2 }}>
-        The goal of the Live Demo deployment is to simplify the process of configuring all of the resources necessary for a Dialogflow Agent with a Cloud Functions webhook. The deployment dashboard uses {terraformLink} to deploy and configure all of these resources on your behalf into a project that you own (your "Home Project"), to that you can immediately jump in and investage how all of the components work together. Any dependencies or preconditions that are necessary to deploy the Dialogflow Agent are inferred and handled automatically (with a few exceptions; see <Link href='#deploymentDashboard'>"Before you Begin: Prerequisites"</Link>).
+        The goal of the Live Demo Launch Pad is to simplify the process of configuring all of the resources necessary for a Dialogflow Agent with a Cloud Functions webhook. The deployment dashboard uses {terraformLink} to deploy and configure all of these resources on your behalf into a project that you own (your "Home Project"), to that you can immediately jump in and investage how all of the components work together. Any dependencies or preconditions that are necessary to deploy the Dialogflow Agent are inferred and handled automatically (with a few exceptions; see <Link href='#deploymentDashboard'>"Before you Begin: Prerequisites"</Link>).
       </Typography>
 
       <Typography paragraph sx={{ ml:2 }}>
