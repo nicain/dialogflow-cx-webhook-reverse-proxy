@@ -13,7 +13,6 @@ import {ServicesPanel, NetworkPanel, AgentPanel, QueryPollAssetStatus, QueryTogg
 import Paper from '@mui/material/Paper';
 import { handleTokenExpired } from './Utilities.js'
 
-import {webhook_name_default} from './DataModel'
 
 function ProjectIdInputField(props) {
 
