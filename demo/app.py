@@ -63,7 +63,8 @@ def login_landing_uri(request, query_params={}):
   app.logger.info(f'login_landing_uri(request): landing_uri="{landing_uri}"')
   return landing_uri
 
-AUTH_SERVICE_HOSTNAME = 'authentication-service-moxl25afhq-uc.a.run.app'
+AUTH_SERVICE_HOSTNAME = 'auth.dialogflow-demo.app'
+# AUTH_SERVICE_HOSTNAME = 'authentication-service-moxl25afhq-uc.a.run.app'
 AUTH_SERVICE_AUTH_ENDPOINT = f'http://{AUTH_SERVICE_HOSTNAME}/auth'
 # AUTH_SERVICE_VERIFY_AUD_ENDPOINT = f'http://{AUTH_SERVICE_HOSTNAME}/verify_aud'
 AUTH_SERVICE_LOGIN_ENDPOINT = f'http://{AUTH_SERVICE_HOSTNAME}/login'
