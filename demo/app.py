@@ -912,10 +912,11 @@ def asset_status():
     resource_id_dict = {}
     if update:
       result = tasks.tf_plan(c, module, workdir, env, debug, target=target)
-      if 'response' in result: return result['response']
-      for hook in result['hooks']['refresh_complete']:
-        if 'id_value' in hook:
-          resource_id_dict[hook['resource']['addr']] = hook['id_value']
+      if result is not None:
+        if 'response' in result: return result['response']
+        for hook in result['hooks']['refresh_complete']:
+          if 'id_value' in hook:
+            resource_id_dict[hook['resource']['addr']] = hook['id_value']
 
     if ACCESS_POLICY_RESOURCE in resource_id_dict:
       access_policy_id = resource_id_dict[ACCESS_POLICY_RESOURCE]

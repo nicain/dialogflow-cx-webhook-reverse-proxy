@@ -42,7 +42,15 @@ variable "reverse_proxy_server_ip" {
   default     = "10.10.20.2"
 }
 
-variable "compute_api" {
+variable "proxy_permission_storage" {
+  type = object({})
+}
+
+variable "proxy_permission_registry" {
+  type = object({})
+}
+
+variable "proxy_permission_invoke" {
   type = object({})
 }
 
@@ -68,7 +76,9 @@ resource "google_compute_network" "vpc_network" {
   project = var.project_id
   auto_create_subnetworks = false
   depends_on = [
-    var.compute_api
+    var.proxy_permission_storage,
+    var.proxy_permission_registry,
+    var.proxy_permission_invoke
   ]
 }
 

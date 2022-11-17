@@ -116,6 +116,37 @@ resource "google_project_service" "compute" {
   disable_dependent_services = true
 }
 
+data "google_project" "project" {
+  project_id     = var.project_id
+}
+
+resource "google_project_iam_member" "storage_admin" {
+  project = var.project_id
+  role    = "roles/storage.admin"
+  member  = "serviceAccount:${data.google_project.project.number}-compute@developer.gserviceaccount.com"
+  depends_on = [
+    google_project_service.compute
+  ]
+}
+
+resource "google_project_iam_member" "registry_reader" {
+  project = var.project_id
+  role    = "roles/artifactregistry.reader"
+  member  = "serviceAccount:${data.google_project.project.number}-compute@developer.gserviceaccount.com"
+  depends_on = [
+    google_project_service.compute
+  ]
+}
+
+resource "google_project_iam_member" "webhook_invoker" {
+  project = var.project_id
+  role    = "roles/cloudfunctions.invoker"
+  member  = "serviceAccount:${data.google_project.project.number}-compute@developer.gserviceaccount.com"
+  depends_on = [
+    google_project_service.compute
+  ]
+}
+
 resource "google_project_service" "dialogflow" {
   service = "dialogflow.googleapis.com"
   project            = var.project_id
@@ -188,7 +219,9 @@ module "vpc_network" {
   vpc_network = var.vpc_network
   vpc_subnetwork = var.vpc_subnetwork
   reverse_proxy_server_ip = var.reverse_proxy_server_ip
-  compute_api = google_project_service.compute
+  proxy_permission_storage = google_project_iam_member.storage_admin
+  proxy_permission_registry = google_project_iam_member.registry_reader
+  proxy_permission_invoke = google_project_iam_member.webhook_invoker
   iam_api = google_project_service.iam
   dialogflow_api = google_project_service.dialogflow
   proxy_server_src = var.proxy_server_src
