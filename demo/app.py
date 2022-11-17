@@ -749,6 +749,8 @@ def service_directory_webhook_fulfillment_status():
   result = get_agents(token, project_id, region)
   if 'response' in result:
     return result['response']
+  if 'Telecommunications' not in result['data']:
+    return Response(status=200, response=json.dumps({'status':'BLOCKED', 'reason':'AGENT_NOT_FOUND'})) 
   agent_name = result['data']['Telecommunications']['name']
   result = get_webhooks(token, agent_name, project_id, region)
   if 'response' in result:
