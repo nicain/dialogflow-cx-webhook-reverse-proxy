@@ -834,7 +834,7 @@ def update_service_directory_webhook_fulfillment():
 def get_principal():
   token_dict = get_token(request, token_type='email')
   if 'response' in token_dict:
-    return token_dict['response']
+    return redirect(url_for('logout'))
   return Response(status=200, response=json.dumps({'principal': token_dict['email']}))
   
 
