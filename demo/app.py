@@ -50,7 +50,7 @@ def login_landing_uri(request, query_params={}):
     landing_uri = 'http://user-service.localhost:8080'
   else:
     assert PROD
-    landing_uri = request.host_url
+    landing_uri = request.host_url.replace('http://', 'https://')
 
   if landing_uri[-1] == '/':
     landing_uri = landing_uri[:-1]
@@ -834,10 +834,7 @@ def update_service_directory_webhook_fulfillment():
 def get_principal():
   token_dict = get_token(request, token_type='email')
   if 'response' in token_dict:
-    if PROD:
-      return redirect(url_for('logout', _scheme='https', _external=True))
-    else:
-      return redirect(url_for('logout'))
+    return redirect(url_for('logout'))
   return Response(status=200, response=json.dumps({'principal': token_dict['email']}))
   
 

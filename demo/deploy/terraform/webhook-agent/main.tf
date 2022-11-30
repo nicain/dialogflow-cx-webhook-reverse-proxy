@@ -80,7 +80,7 @@ resource "google_cloudfunctions_function" "webhook" {
   timeout               = 60
   entry_point           = "cxPrebuiltAgentsTelecom"
   region = var.region
-  ingress_settings = "ALLOW_INTERNAL_ONLY"
+  ingress_settings = "ALLOW_ALL"
   depends_on = [
     time_sleep.wait_for_apis,
     var.bucket
