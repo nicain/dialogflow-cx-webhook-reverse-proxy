@@ -841,11 +841,13 @@ def get_principal():
 @app.route('/validate_project_id', methods=['get'])
 def validate_project_id():
   project_id = request.args.get('project_id', None)
+  app.logger.info(f'project_id to validate: "{project_id}"')
   if not project_id:
+    app.logger.info(f'project_id empty')
     return Response(status=200, response=json.dumps({'status':False}, indent=2))
   token_dict = get_token(request, token_type='access_token')
   if 'response' in token_dict:
-    print("ERROR TO DEBUG", token_dict['response'])
+    app.logger.info(f'ERROR TO DEBUG: {token_dict["response"]}')
     return token_dict['response']
   access_token = token_dict['access_token']
 
@@ -856,6 +858,7 @@ def validate_project_id():
   if r.status_code == 200:
     return Response(status=200, response=json.dumps({'status':True}, indent=2))
   else:
+    app.logger.info(f'cloudresourcemanager request not 200: {r.text}')
     return Response(status=200, response=json.dumps({'status':False}, indent=2))
 
 

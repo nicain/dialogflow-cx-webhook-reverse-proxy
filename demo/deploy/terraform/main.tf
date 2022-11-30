@@ -189,6 +189,27 @@ resource "google_project_service" "iam" {
   disable_dependent_services = true
 }
 
+resource "google_project_service" "artifactregistry" {
+  service = "artifactregistry.googleapis.com"
+  project            = var.project_id
+  disable_on_destroy = false
+  disable_dependent_services = true
+}
+
+resource "google_project_service" "serviceusageapi" {
+  service = "serviceusageapi.googleapis.com"
+  project            = var.project_id
+  disable_on_destroy = false
+  disable_dependent_services = true
+}
+
+resource "google_project_service" "pubsub" {
+  service = "pubsub.googleapis.com"
+  project            = var.project_id
+  disable_on_destroy = false
+  disable_dependent_services = true
+}
+
 resource "google_storage_bucket" "bucket" {
   name     = var.bucket
   location = "US"
@@ -209,6 +230,9 @@ module "services" {
     google_project_service.accesscontextmanager,
     google_project_service.iam,
     google_project_service.cloudbilling,
+    google_project_service.artifactregistry,
+    google_project_service.serviceusageapi,
+    google_project_service.pubsub,
   ]
 }
 
@@ -224,6 +248,9 @@ module "vpc_network" {
   proxy_permission_invoke = google_project_iam_member.webhook_invoker
   iam_api = google_project_service.iam
   dialogflow_api = google_project_service.dialogflow
+  artifactregistry_api = google_project_service.artifactregistry
+  pubsub_api = google_project_service.pubsub
+  cloudbuild_api = google_project_service.cloudbuild
   proxy_server_src = var.proxy_server_src
   access_token = var.access_token
   bucket = google_storage_bucket.bucket

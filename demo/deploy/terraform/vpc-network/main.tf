@@ -66,6 +66,18 @@ variable "dialogflow_api" {
   type = object({})
 }
 
+variable "artifactregistry_api" {
+  type = object({})
+}
+
+variable "pubsub_api" {
+  type = object({})
+}
+
+variable "cloudbuild_api" {
+  type = object({})
+}
+
 variable "bucket_name" {
   description = "bucket_name"
   type        = string
@@ -165,6 +177,9 @@ resource "google_storage_bucket_object" "proxy_server_source" {
 
 resource "google_pubsub_topic" "reverse_proxy_server_build" {
   name = "build"
+  depends_on = [
+    var.pubsub_api
+  ]
 }
 
 resource "google_artifact_registry_repository" "webhook_registry" {
@@ -172,6 +187,9 @@ resource "google_artifact_registry_repository" "webhook_registry" {
   repository_id = "webhook-registry"
   format        = "DOCKER"
   project       = var.project_id
+  depends_on = [
+    var.artifactregistry_api
+  ]
 }
 
 resource "google_cloudbuild_trigger" "reverse_proxy_server" {
@@ -201,7 +219,8 @@ resource "google_cloudbuild_trigger" "reverse_proxy_server" {
   }
   depends_on = [
     google_artifact_registry_repository.webhook_registry,
-    var.bucket
+    var.bucket,
+    var.cloudbuild_api,
   ]
 
   provisioner "local-exec" {
