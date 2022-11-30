@@ -300,6 +300,9 @@ resource "google_compute_instance" "reverse_proxy_server" {
     var.bucket,
     google_project_iam_member.dfsa_sd_viewer,
     google_project_iam_member.dfsa_sd_pscAuthorizedService,
+    google_compute_router_nat.nat_manual,
+    google_compute_firewall.allow_dialogflow,
+    google_compute_firewall.allow,
   ]
   
 }

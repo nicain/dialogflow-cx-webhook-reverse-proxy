@@ -102,11 +102,21 @@ terraform {
   }
 }
 
+resource "google_project_service" "serviceusageapi" {
+  service = "serviceusageapi.googleapis.com"
+  project            = var.project_id
+  disable_on_destroy = false
+  disable_dependent_services = true
+}
+
 resource "google_project_service" "servicedirectory" {
   service = "servicedirectory.googleapis.com"
   project            = var.project_id
   disable_on_destroy = false
   disable_dependent_services = true
+  depends_on = [
+    google_project_service.serviceusageapi
+  ]
 }
 
 resource "google_project_service" "compute" {
@@ -114,6 +124,9 @@ resource "google_project_service" "compute" {
   project            = var.project_id
   disable_on_destroy = false
   disable_dependent_services = true
+  depends_on = [
+    google_project_service.serviceusageapi
+  ]
 }
 
 data "google_project" "project" {
@@ -152,6 +165,9 @@ resource "google_project_service" "dialogflow" {
   project            = var.project_id
   disable_on_destroy = false
   disable_dependent_services = true
+  depends_on = [
+    google_project_service.serviceusageapi
+  ]
 }
 
 resource "google_project_service" "cloudfunctions" {
@@ -159,6 +175,9 @@ resource "google_project_service" "cloudfunctions" {
   project            = var.project_id
   disable_on_destroy = false
   disable_dependent_services = true
+  depends_on = [
+    google_project_service.serviceusageapi
+  ]
 }
 
 resource "google_project_service" "cloudbuild" {
@@ -166,6 +185,9 @@ resource "google_project_service" "cloudbuild" {
   project            = var.project_id
   disable_on_destroy = false
   disable_dependent_services = true
+  depends_on = [
+    google_project_service.serviceusageapi
+  ]
 }
 
 resource "google_project_service" "accesscontextmanager" {
@@ -173,6 +195,9 @@ resource "google_project_service" "accesscontextmanager" {
   project            = var.project_id
   disable_on_destroy = false
   disable_dependent_services = true
+  depends_on = [
+    google_project_service.serviceusageapi
+  ]
 }
 
 resource "google_project_service" "cloudbilling" {
@@ -180,6 +205,9 @@ resource "google_project_service" "cloudbilling" {
   project            = var.project_id
   disable_on_destroy = false
   disable_dependent_services = true
+  depends_on = [
+    google_project_service.serviceusageapi
+  ]
 }
 
 resource "google_project_service" "iam" {
@@ -187,6 +215,9 @@ resource "google_project_service" "iam" {
   project            = var.project_id
   disable_on_destroy = false
   disable_dependent_services = true
+  depends_on = [
+    google_project_service.serviceusageapi
+  ]
 }
 
 resource "google_project_service" "artifactregistry" {
@@ -194,20 +225,21 @@ resource "google_project_service" "artifactregistry" {
   project            = var.project_id
   disable_on_destroy = false
   disable_dependent_services = true
+  depends_on = [
+    google_project_service.serviceusageapi
+  ]
 }
 
-resource "google_project_service" "serviceusageapi" {
-  service = "serviceusageapi.googleapis.com"
-  project            = var.project_id
-  disable_on_destroy = false
-  disable_dependent_services = true
-}
+
 
 resource "google_project_service" "pubsub" {
   service = "pubsub.googleapis.com"
   project            = var.project_id
   disable_on_destroy = false
   disable_dependent_services = true
+  depends_on = [
+    google_project_service.serviceusageapi
+  ]
 }
 
 resource "google_storage_bucket" "bucket" {
@@ -221,6 +253,7 @@ resource "google_storage_bucket" "bucket" {
 module "services" {
   source = "/app/deploy/terraform/services"
   project_id = var.project_id
+  serviceusageapi_api = google_project_service.serviceusageapi
   depends_on = [
     google_project_service.servicedirectory,
     google_project_service.compute,
